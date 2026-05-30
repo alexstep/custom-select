@@ -48,7 +48,7 @@
     "**/*.css"
   ],
   "scripts": {
-    "minify": "rm -rf dist && mkdir -p dist && bun build custom-select.js --minify --splitting --outdir=dist --entry-naming=custom-select.min.js --chunk-naming='[name].min.js' && cat styles/base.css styles/mobile.css styles/themes.css > dist/custom-select.bundle.css && bun build dist/custom-select.bundle.css --minify --outfile=dist/custom-select.min.css && rm -f dist/custom-select.bundle.css",
+    "minify": "rm -rf dist && mkdir -p dist && bun build custom-select.js --minify --splitting --outdir=dist --entry-naming=custom-select.min.js --chunk-naming='[name].[hash].min.js' && cat styles/base.css styles/mobile.css styles/themes.css > dist/custom-select.bundle.css && bun build dist/custom-select.bundle.css --minify --outfile=dist/custom-select.min.css && rm -f dist/custom-select.bundle.css",
     "gzip": "cd dist && gzip -f -k *.min.js *.min.css",
     "brotli": "cd dist && brotli -f -q 11 *.min.js *.min.css",
     "compress": "npm run gzip && npm run brotli",

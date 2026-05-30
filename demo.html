@@ -5,11 +5,12 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Pure Custom Select — demo</title>
 
-  <!-- Production build: npm run build → dist/ -->
-  <link rel="stylesheet" href="./dist/custom-select.min.css">
-
+  <!-- Source ESM (lazy chunks on first open; dist/ only for npm publish) -->
+  <link rel="stylesheet" href="./styles/base.css">
+  <link rel="stylesheet" href="./styles/mobile.css">
+  <link rel="stylesheet" href="./styles/themes.css">
   <script type="module">
-    import CustomSelect from './dist/custom-select.min.js'
+    import CustomSelect from './custom-select.js'
     customElements.define('custom-select', CustomSelect)
   </script>
 

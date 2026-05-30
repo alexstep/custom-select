@@ -77,6 +77,7 @@ const CustomSelect = class extends HTMLElement {
   // Lazy loaded modules cache
   #desktopPopupModule = null
   #mobileSheetModule = null
+  #ensurePopupPromise = null
 
   constructor() {
     super()
@@ -398,16 +399,8 @@ const CustomSelect = class extends HTMLElement {
     this.#optionWatcher?.disconnect()
     this.#typeaheadCleanup?.()
 
-    // Cleanup popup if it was added to document.body (shadow DOM mode)
-    if (this.$popup && this.$popup._inBody && this.$popup.parentNode === document.body) {
-      // Close popup first if it's open - unlock scroll before closing
-      if (this.$popup.open) {
-        unlockScroll()
-        this.$popup.close()
-      }
-      document.body.removeChild(this.$popup)
-      this.$popup = null
-    }
+    // Cleanup popup (light DOM or document.body in shadow mode)
+    this.#destroyPopup()
   }
 
   // ============================================
@@ -863,6 +856,9 @@ const CustomSelect = class extends HTMLElement {
       return
     }
 
+    this.#clearPopupListeners()
+    this.#destroyPopup()
+
     this.#container.innerHTML = this.#selectHtml()
 
     // Popup is created lazily, don't query for it
@@ -1084,39 +1080,87 @@ const CustomSelect = class extends HTMLElement {
    * Загружает desktop-popup модуль при первом вызове
    */
   async #ensurePopup() {
-    if (this.$popup) {
-      return this.$popup // Already created
+    if (this.$popup?.isConnected) {
+      return this.$popup
     }
 
-    // Lazy load desktop popup module
+    if (this.#ensurePopupPromise) {
+      return this.#ensurePopupPromise
+    }
+
+    this.#ensurePopupPromise = this.#createPopupOnce()
+    try {
+      return await this.#ensurePopupPromise
+    } finally {
+      this.#ensurePopupPromise = null
+    }
+  }
+
+  async #createPopupOnce() {
+    if (this.$popup && !this.$popup.isConnected) {
+      this.#appendPopupToDom(this.$popup)
+      return this.$popup
+    }
+
+    this.#removeOrphanPopups()
+
     const { createPopupHTML } = await this.#loadDesktopPopup()
 
-    // Create popup on first access
-    this.$popup = document.createElement('dialog')
-    this.$popup.className = 'cs-popup'
+    const popup = document.createElement('dialog')
+    popup.className = 'cs-popup'
+    popup.__csSelect = this
 
     const { items, groups } = this._groupedItems()
-    this.$popup.innerHTML = createPopupHTML(items, groups)
+    popup.innerHTML = createPopupHTML(items, groups)
 
-    // Generate unique ID for popup
     this.#popupId = `cs-popup-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
-    this.$popup.id = this.#popupId
+    popup.id = this.#popupId
+    popup.dataset.theme = this.#theme
 
-    // Передаем тему для CSS переменных (особенно важно для Shadow DOM)
-    this.$popup.dataset.theme = this.#theme
+    this.$popup = popup
+    this.#appendPopupToDom(popup)
+    return popup
+  }
 
-    // Popup must remain in light DOM for showModal() to work properly
-    // When shadow DOM is enabled, appendChild adds to shadow root, so add to document.body
+  #appendPopupToDom(popup) {
     if (this.shadowRoot) {
-      // With shadow DOM: add popup to document.body for proper showModal() and positioning
-      document.body.appendChild(this.$popup)
-      this.$popup._inBody = true
+      document.body.appendChild(popup)
+      popup._inBody = true
     } else {
-      // Without shadow DOM: normal appendChild works
-      this.appendChild(this.$popup)
+      this.appendChild(popup)
+      popup._inBody = false
+    }
+  }
+
+  #removeOrphanPopups(keep = null) {
+    const candidates = this.shadowRoot
+      ? [...document.querySelectorAll('dialog.cs-popup')].filter(dialog => dialog.__csSelect === this)
+      : [...this.querySelectorAll(':scope > dialog.cs-popup')]
+
+    for (const dialog of candidates) {
+      if (dialog === keep) continue
+      if (dialog.open) {
+        unlockScroll()
+        dialog.close()
+      }
+      dialog.remove()
+    }
+  }
+
+  #destroyPopup() {
+    const popup = this.$popup
+    this.$popup = null
+    this.#popupId = null
+
+    if (popup) {
+      if (popup.open) {
+        unlockScroll()
+        popup.close()
+      }
+      popup.remove()
     }
 
-    return this.$popup
+    this.#removeOrphanPopups()
   }
 
   /**

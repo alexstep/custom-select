@@ -345,7 +345,7 @@ custom-select {
       overflow: hidden;
       isolation: isolate;
 
-      /* Подсветка шире строки — при scale(0.98) фон не отходит от краёв */
+      /* Подсветка шире строки — при scale фон не отходит от краёв */
       &::before {
         content: "";
         position: absolute;
@@ -377,13 +377,9 @@ custom-select {
         mask: var(--cs-svg-check) no-repeat center / 45%;
       }
 
-      /* Эффект нажатия: сжимаем строку, фон компенсируем обратным scale */
+      /* Эффект нажатия: сжимаем строку */
       &:active:not([disabled]) {
-        transform: scale(0.98);
-
-        &::before {
-          transform: scale(1.020408);
-        }
+        transform: scale(0.94);
       }
 
       &[disabled] {

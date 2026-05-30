@@ -1,0 +1,82 @@
+{
+  "name": "pure-custom-select",
+  "version": "1.1.0",
+  "description": "A lightweight, high-performance custom select web component with native mobile fallback, keyboard support, and built-in filtering.",
+  "type": "module",
+  "main": "index.js",
+  "module": "index.js",
+  "browser": "index.js",
+  "types": "./types/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./types/index.d.ts",
+      "import": "./index.js",
+      "default": "./index.js"
+    },
+    "./custom-select.js": {
+      "types": "./types/custom-select.d.ts",
+      "import": "./custom-select.js",
+      "default": "./custom-select.js"
+    },
+    "./dist/custom-select.min.js": "./dist/custom-select.min.js",
+    "./dist/custom-select.min.css": "./dist/custom-select.min.css",
+    "./dist/*": "./dist/*",
+    "./styles/*.css": "./styles/*.css"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "files": [
+    "index.js",
+    "custom-select.js",
+    "core/",
+    "ui/",
+    "utils/",
+    "keyboard/",
+    "filter/",
+    "styles/",
+    "dist/*.min.js",
+    "dist/*.min.css",
+    "LICENSE",
+    "README.md",
+    "types/"
+  ],
+  "devDependencies": {
+    "typescript": "^5.7.0"
+  },
+  "sideEffects": [
+    "**/*.css"
+  ],
+  "scripts": {
+    "minify": "rm -rf dist && mkdir -p dist && bun build custom-select.js --minify --splitting --outdir=dist --entry-naming=custom-select.min.js --chunk-naming='[name]-[hash].min.js' && cat styles/base.css styles/mobile.css styles/themes.css > dist/custom-select.bundle.css && bun build dist/custom-select.bundle.css --minify --outfile=dist/custom-select.min.css && rm -f dist/custom-select.bundle.css",
+    "gzip": "cd dist && gzip -f -k *.min.js *.min.css",
+    "brotli": "cd dist && brotli -f -q 11 *.min.js *.min.css",
+    "compress": "npm run gzip && npm run brotli",
+    "build": "npm run minify && npm run compress",
+    "prepublishOnly": "npm run build",
+    "types:check": "tsc -p tsconfig.declarations.json --noEmit",
+    "types:emit-from-js": "tsc -p tsconfig.types.json",
+    "test": "node -e \"console.log('no tests yet')\""
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/alexstep/custom-select.git"
+  },
+  "keywords": [
+    "web-component",
+    "select",
+    "dropdown",
+    "form",
+    "mobile-first",
+    "accessible",
+    "searchable",
+    "typeahead",
+    "a11y"
+  ],
+  "author": "alexstep",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/alexstep/custom-select/issues"
+  },
+  "homepage": "https://github.com/alexstep/custom-select#readme"
+}

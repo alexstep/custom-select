@@ -1,0 +1,255 @@
+/**
+ * =============================================================================
+ * МОБИЛЬНЫЕ СТИЛИ CUSTOM-SELECT (BOTTOM SHEET)
+ * =============================================================================
+ * Dialog монтируется в document.body — тема задаётся на .cs-mobile-dialog
+ * (data-theme + переменные из themes.css).
+ */
+
+dialog.cs-mobile-dialog {
+  border: none;
+  background: transparent;
+  padding: 0;
+  margin: 0;
+  max-width: none;
+  max-height: none;
+  width: 100vw;
+  height: 100vh;
+  height: 100dvh;
+  outline: none;
+  overflow: hidden;
+  display: block;
+  color: var(--cs-text);
+}
+
+dialog.cs-mobile-dialog[open] {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  align-items: center;
+}
+
+dialog.cs-mobile-dialog::backdrop {
+  background: rgba(0, 0, 0, 0.35);
+}
+
+.cs-mobile-dialog[data-theme="light"]::backdrop {
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.cs-mobile-sheet {
+  width: 92vw;
+  max-height: 95vh;
+  background: var(--cs-sheet-bg, var(--fg-color, #fff));
+  color: var(--cs-text);
+  border: 1px solid var(--cs-border);
+  border-bottom: none;
+  border-radius: var(--cs-border-radius, 10px) var(--cs-border-radius, 10px) 0 0;
+  box-shadow: 0 -0.25rem 1.25rem rgba(0, 0, 0, 0.15);
+  transform: translateY(100%);
+  transition: transform var(--cs-animation-duration) var(--cs-animation-timing);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.cs-mobile-dialog[data-theme="dark"] .cs-mobile-sheet,
+.cs-mobile-dialog[data-theme="auto"] .cs-mobile-sheet {
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+
+@media screen and (prefers-color-scheme: light) {
+  .cs-mobile-dialog[data-theme="auto"] .cs-mobile-sheet {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+}
+
+.cs-mobile-sheet.cs-is-searchable {
+  height: 95vh;
+}
+
+.cs-mobile-sheet.show {
+  transform: translateY(0);
+}
+
+.cs-mobile-sheet.hide {
+  transform: translateY(100%);
+}
+
+.cs-mobile-sheet-header {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  background: transparent;
+  flex-shrink: 0;
+  touch-action: none;
+  z-index: 2;
+  border-bottom: 1px solid var(--cs-border);
+}
+
+.cs-mobile-sheet-handle {
+  width: 36px;
+  height: 4px;
+  background: var(--cs-muted-text);
+  border-radius: 2px;
+  margin: 8px auto;
+  opacity: 0.45;
+  flex-shrink: 0;
+}
+
+.cs-mobile-sheet-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0;
+  -webkit-overflow-scrolling: touch;
+}
+
+.cs-mobile-sheet-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.cs-mobile-sheet-list h6 {
+  margin: 0;
+  padding: 12px 16px 8px 16px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--cs-muted-text);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  background: transparent;
+}
+
+.cs-mobile-sheet-item {
+  padding: 12px 16px;
+  cursor: pointer;
+  user-select: none;
+  border-bottom: 1px solid var(--cs-border);
+  background: transparent;
+  color: var(--cs-text);
+  transition: background-color 0.2s ease;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 48px;
+  touch-action: manipulation;
+}
+
+.cs-mobile-sheet-item:last-child {
+  border-bottom: none;
+}
+
+.cs-mobile-sheet-item:active:not(.disabled) {
+  background: var(--cs-hover-bg);
+}
+
+.cs-mobile-sheet-item.selected {
+  background: var(--cs-accent-bg-alpha);
+  color: var(--cs-accent-text-color);
+}
+
+.cs-mobile-sheet-item.selected::after {
+  content: "";
+  width: 20px;
+  height: 20px;
+  background-color: currentColor;
+  -webkit-mask:
+    url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd" /></svg>')
+    no-repeat center / contain;
+  mask:
+    url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd" /></svg>')
+    no-repeat center / contain;
+  flex-shrink: 0;
+  margin-left: 12px;
+}
+
+.cs-mobile-sheet-item.disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.cs-mobile-sheet-item span {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 16px;
+  line-height: 24px;
+  color: inherit;
+}
+
+.cs-mobile-sheet-item mark {
+  background: var(--cs-mark-bg);
+  color: inherit;
+  border-radius: 2px;
+  padding: 0 2px;
+  margin: 0 -2px;
+}
+
+.cs-mobile-filter-container {
+  padding: 0.125rem 0.5rem 0.25rem 0.5rem;
+  background: transparent;
+  flex-shrink: 0;
+}
+
+.cs-mobile-filter-input {
+  width: 100%;
+  height: 2.25rem;
+  padding: 0 0.75rem;
+  border: none;
+  border-radius: 8px;
+  font-size: 16px;
+  outline: none;
+  background: var(--cs-input-bg);
+  color: var(--cs-text);
+  box-sizing: border-box;
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+.cs-mobile-filter-input::placeholder {
+  color: var(--cs-muted-text);
+  opacity: 1;
+}
+
+.cs-mobile-filter-input:focus {
+  outline: none;
+}
+
+@supports (padding: max(0px)) {
+  .cs-mobile-sheet {
+    padding-bottom: env(safe-area-inset-bottom, 0);
+  }
+
+  .cs-mobile-sheet-content {
+    padding-bottom: calc(0.5rem + env(safe-area-inset-bottom, 0));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cs-mobile-sheet,
+  .cs-mobile-sheet-item {
+    transition: none;
+    animation: none;
+  }
+
+  .cs-mobile-sheet-item:active {
+    transform: none;
+  }
+}
+
+@media (prefers-contrast: high) {
+  .cs-mobile-sheet-item {
+    border-bottom: 2px solid var(--cs-border);
+  }
+
+  .cs-mobile-sheet-handle {
+    background: var(--cs-text);
+    opacity: 1;
+  }
+}

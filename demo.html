@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="auto">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pure Custom Select — demo</title>
+
+  <!-- Production build: npm run build → dist/ -->
+  <link rel="stylesheet" href="./dist/custom-select.min.css">
+
+  <script type="module">
+    import CustomSelect from './dist/custom-select.min.js'
+    customElements.define('custom-select', CustomSelect)
+  </script>
+
+  <style>
+    /* ===== Demo page theming (drives both page and component via CSS vars) ===== */
+    :root {
+      --page-bg: #f6f7f9;
+      --page-fg: #1a1d21;
+      --card-bg: #ffffff;
+      --card-border: #e4e7ec;
+      --muted: #6b7280;
+      --accent: #0059D1;
+      --code-bg: #f1f3f5;
+    }
+    html[data-theme="dark"] {
+      --page-bg: #0f1115;
+      --page-fg: #e7e9ee;
+      --card-bg: #171a21;
+      --card-border: #262b34;
+      --muted: #99a1b3;
+      --accent: #0059D1;
+      --code-bg: #11151c;
+      color-scheme: dark;
+    }
+    html[data-theme="light"] { color-scheme: light; }
+    @media (prefers-color-scheme: dark) {
+      html[data-theme="auto"] {
+        --page-bg: #0f1115;
+        --page-fg: #e7e9ee;
+        --card-bg: #171a21;
+        --card-border: #262b34;
+        --muted: #99a1b3;
+        --accent: #0059D1;
+        --code-bg: #11151c;
+        color-scheme: dark;
+      }
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
+      -webkit-touch-callout: none;
+      margin: 0;
+      font: 15px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      background: var(--page-bg);
+      color: var(--page-fg);
+      -webkit-font-smoothing: antialiased;
+    }
+    *, *::after, *::before {
+      -webkit-user-drag: none;
+      -webkit-app-region: no-drag;
+    }
+    input:-webkit-autofill,
+    input:-webkit-autofill:focus {
+      transition:
+        background-color 600000s 0s,
+        color 600000s 0s;
+    }
+    input[data-autocompleted] {
+      background-color: transparent !important;
+    }
+
+    .wrap { max-width: 960px; margin: 0 auto; padding: 2.5rem 1.25rem 5rem; }
+
+    header.hero { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 1rem; margin-bottom: 2rem; }
+    header.hero h1 { font-size: 1.9rem; margin: 0 0 .35rem; letter-spacing: -.02em; }
+    header.hero p { margin: 0; color: var(--muted); max-width: 46ch; }
+
+    .theme-switch { display: inline-flex; background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 10px; padding: 3px; gap: 2px; }
+    .theme-switch button {
+      border: 0; background: transparent; color: var(--muted); cursor: pointer;
+      padding: .4rem .8rem; border-radius: 7px; font: inherit; font-size: .85rem;
+      transition: background .15s, color .15s;
+    }
+    .theme-switch button[aria-pressed="true"] { background: var(--accent); color: #fff; }
+
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1rem; }
+    .card { background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 14px; padding: 1.15rem 1.15rem 1.25rem; }
+    .card h2 { font-size: .95rem; margin: 0 0 .15rem; letter-spacing: -.01em; }
+    .card .hint { margin: 0 0 .9rem; color: var(--muted); font-size: .82rem; }
+    .card.span-2 { grid-column: 1 / -1; }
+
+    /* Drive component colors from the demo palette so the theme toggle
+       re-themes the selects too (shows how to override via CSS variables). */
+    custom-select {
+      --cs-min-width: 100%;
+      --cs-border-radius: 10px;
+      --cs-bg: var(--card-bg);
+      --cs-text: var(--page-fg);
+      --cs-border: var(--card-border);
+      --cs-accent-bg: var(--accent);
+      --cs-accent-text: #fff;
+      --cs-focus-ring: color-mix(in srgb, var(--accent), transparent 35%);
+      --cs-popup-shadow: 0 14px 40px rgba(0, 0, 0, 0.16), 0 4px 14px rgba(0, 0, 0, 0.1);
+      display: block;
+      margin: 0;
+      width: 100%;
+    }
+    html[data-theme="dark"] custom-select {
+      --cs-popup-shadow: 0 16px 48px rgba(0, 0, 0, 0.45), 0 6px 18px rgba(0, 0, 0, 0.25);
+    }
+
+    .out { margin-top: .75rem; font-size: .8rem; color: var(--muted); min-height: 1.2em; }
+    .out b { color: var(--page-fg); font-weight: 600; }
+    code, pre { user-select: text; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+    pre { background: var(--code-bg); border: 1px solid var(--card-border); border-radius: 10px; padding: .85rem 1rem; overflow:auto; font-size: .8rem; margin: .25rem 0 0; }
+    .row { display:flex; gap:.6rem; align-items:center; flex-wrap: wrap; }
+    button.btn { font: inherit; cursor: pointer; border: 1px solid var(--card-border); background: var(--card-bg); color: var(--page-fg); padding: .5rem .9rem; border-radius: 9px; }
+    button.btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+    footer { margin-top: 3rem; color: var(--muted); font-size: .82rem; text-align:center; }
+    footer a { color: var(--accent); }
+
+    /* Customization showcase: scoped CSS-variable overrides */
+    #fancy {
+      --cs-bg: linear-gradient(135deg, #6d28d9, #db2777);
+      --cs-text: #fff;
+      --cs-border: rgba(255,255,255,.25);
+      --cs-border-radius: 14px;
+      --cs-accent-bg: rgba(255,255,255,.18);
+      --cs-accent-text: #fff;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header class="hero">
+      <div>
+        <h1>Pure Custom Select</h1>
+        <p>Zero-dependency select web component. Native on mobile, keyboard-accessible, themeable. Try it on touch devices too.</p>
+      </div>
+      <div class="theme-switch" id="themeSwitch" role="group" aria-label="Theme">
+        <button data-theme="light">Light</button>
+        <button data-theme="dark">Dark</button>
+        <button data-theme="auto" aria-pressed="true">Auto</button>
+      </div>
+    </header>
+
+    <div class="grid">
+      <!-- Basic -->
+      <section class="card">
+        <h2>Basic</h2>
+        <p class="hint">Single choice with a placeholder.</p>
+        <custom-select name="fruit" placeholder="Pick a fruit…">
+          <option value="apple">Apple</option>
+          <option value="banana">Banana</option>
+          <option value="cherry">Cherry</option>
+          <option value="mango">Mango</option>
+        </custom-select>
+        <div class="out" data-out="fruit">No selection</div>
+      </section>
+
+      <!-- Pre-selected -->
+      <section class="card">
+        <h2>Pre-selected</h2>
+        <p class="hint"><code>selected</code> on an option sets the initial value.</p>
+        <custom-select name="size">
+          <option value="s">Small</option>
+          <option value="m" selected>Medium</option>
+          <option value="l">Large</option>
+          <option value="xl">X-Large</option>
+        </custom-select>
+        <div class="out" data-out="size">No selection</div>
+      </section>
+
+      <!-- Multiple -->
+      <section class="card">
+        <h2>Multiple</h2>
+        <p class="hint"><code>multiple</code> — value becomes an array.</p>
+        <custom-select name="langs" multiple placeholder="Select languages…">
+          <option value="js">JavaScript</option>
+          <option value="ts">TypeScript</option>
+          <option value="rs">Rust</option>
+          <option value="go">Go</option>
+          <option value="py">Python</option>
+        </custom-select>
+        <div class="out" data-out="langs">No selection</div>
+      </section>
+
+      <!-- Searchable -->
+      <section class="card">
+        <h2>Searchable</h2>
+        <p class="hint"><code>searchable</code> — built-in local filter with highlight.</p>
+        <custom-select name="country" searchable search-placeholder="Type to filter…" placeholder="Choose a country…">
+          <option value="us">United States</option>
+          <option value="ca">Canada</option>
+          <option value="br">Brazil</option>
+          <option value="gb">United Kingdom</option>
+          <option value="de">Germany</option>
+          <option value="fr">France</option>
+          <option value="es">Spain</option>
+          <option value="it">Italy</option>
+          <option value="jp">Japan</option>
+          <option value="kr">South Korea</option>
+          <option value="cn">China</option>
+          <option value="in">India</option>
+          <option value="au">Australia</option>
+          <option value="za">South Africa</option>
+        </custom-select>
+        <div class="out" data-out="country">No selection</div>
+      </section>
+
+      <!-- Async -->
+      <section class="card">
+        <h2>Async search</h2>
+        <p class="hint"><code>onsearch(query)</code> returns matching values (simulated 400ms latency).</p>
+        <custom-select id="asyncSel" name="user" searchable search-placeholder="Search users…" placeholder="Find a user…">
+          <option value="ada">Ada Lovelace</option>
+          <option value="alan">Alan Turing</option>
+          <option value="grace">Grace Hopper</option>
+          <option value="linus">Linus Torvalds</option>
+          <option value="dennis">Dennis Ritchie</option>
+          <option value="margaret">Margaret Hamilton</option>
+          <option value="ken">Ken Thompson</option>
+          <option value="barbara">Barbara Liskov</option>
+        </custom-select>
+        <div class="out" data-out="user">No selection</div>
+      </section>
+
+      <!-- Grouped -->
+      <section class="card">
+        <h2>Grouped</h2>
+        <p class="hint"><code>&lt;optgroup&gt;</code> renders section headers.</p>
+        <custom-select name="city" placeholder="Pick a city…">
+          <optgroup label="Europe">
+            <option value="lon">London</option>
+            <option value="par">Paris</option>
+            <option value="ber">Berlin</option>
+          </optgroup>
+          <optgroup label="Asia">
+            <option value="tok">Tokyo</option>
+            <option value="sgp">Singapore</option>
+            <option value="sel">Seoul</option>
+          </optgroup>
+        </custom-select>
+        <div class="out" data-out="city">No selection</div>
+      </section>
+
+      <!-- Disabled -->
+      <section class="card">
+        <h2>Disabled states</h2>
+        <p class="hint">Disabled options and a fully disabled control.</p>
+        <custom-select name="plan" placeholder="Choose a plan…">
+          <option value="free">Free</option>
+          <option value="pro">Pro</option>
+          <option value="ent" disabled>Enterprise (contact us)</option>
+        </custom-select>
+        <div class="row" style="margin-top:.75rem">
+          <custom-select name="locked" disabled>
+            <option value="x" selected>Locked control</option>
+          </custom-select>
+        </div>
+        <div class="out" data-out="plan">No selection</div>
+      </section>
+
+      <!-- Customized -->
+      <section class="card">
+        <h2>Customized</h2>
+        <p class="hint">Restyled purely via CSS variables — no JS, no overrides of internals.</p>
+        <custom-select id="fancy" name="fancy" placeholder="Gradient theme…">
+          <option value="a">Nebula</option>
+          <option value="b">Aurora</option>
+          <option value="c">Eclipse</option>
+        </custom-select>
+        <pre><code>#fancy {
+  --cs-bg: linear-gradient(135deg, #6d28d9, #db2777);
+  --cs-text: #fff;
+  --cs-border: rgba(255,255,255,.25);
+  --cs-border-radius: 14px;
+}</code></pre>
+      </section>
+
+      <!-- Form integration -->
+      <section class="card span-2">
+        <h2>Form integration</h2>
+        <p class="hint">Works as a native form field via <code>ElementInternals</code>. Submit reads from <code>FormData</code>.</p>
+        <form id="demoForm" class="row" style="align-items:flex-end">
+          <div style="flex:1; min-width:200px">
+            <custom-select name="role" placeholder="Role…">
+              <option value="dev">Developer</option>
+              <option value="design">Designer</option>
+              <option value="pm">Product Manager</option>
+            </custom-select>
+          </div>
+          <div style="flex:1; min-width:200px">
+            <custom-select name="stack" multiple placeholder="Stack…">
+              <option value="node">Node.js</option>
+              <option value="deno">Deno</option>
+              <option value="bun">Bun</option>
+            </custom-select>
+          </div>
+          <button class="btn primary" type="submit">Submit</button>
+          <button class="btn" type="reset">Reset</button>
+        </form>
+        <pre id="formOut">FormData will appear here…</pre>
+      </section>
+    </div>
+
+    <footer>
+      MIT licensed · <a href="https://github.com/alexstep/custom-select" target="_blank" rel="noopener">GitHub</a>
+    </footer>
+  </div>
+
+  <script type="module">
+    // ----- Theme switch -----
+    const root = document.documentElement
+    const sw = document.getElementById('themeSwitch')
+    sw.addEventListener('click', e => {
+      const btn = e.target.closest('button[data-theme]')
+      if (!btn) return
+      const theme = btn.dataset.theme
+      root.dataset.theme = theme
+      sw.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(b === btn)))
+      // Forward theme to components so their popups match (esp. shadow DOM)
+      document.querySelectorAll('custom-select').forEach(s => { s.theme = theme })
+    })
+
+    // ----- Live value output -----
+    const fmt = v => Array.isArray(v) ? (v.length ? v.join(', ') : '—') : (v || '—')
+    document.querySelectorAll('custom-select[name]').forEach(sel => {
+      const out = document.querySelector(`[data-out="${sel.name}"]`)
+      if (!out) return
+      const update = () => { out.innerHTML = `value: <b>${fmt(sel.value)}</b>` }
+      sel.addEventListener('change', update)
+      requestAnimationFrame(update)
+    })
+
+    // ----- Async search -----
+    const asyncSel = document.getElementById('asyncSel')
+    const all = Array.from(asyncSel.querySelectorAll('option')).map(o => ({ value: o.value, label: o.textContent }))
+    asyncSel.onsearch = (query) =>
+      new Promise(resolve => {
+        setTimeout(() => {
+          const q = query.toLowerCase()
+          resolve(all.filter(o => o.label.toLowerCase().includes(q)))
+        }, 400)
+      })
+
+    // ----- Form -----
+    const form = document.getElementById('demoForm')
+    const formOut = document.getElementById('formOut')
+    form.addEventListener('submit', e => {
+      e.preventDefault()
+      const data = {}
+      for (const [k, v] of new FormData(form).entries()) {
+        if (k in data) data[k] = [].concat(data[k], v)
+        else data[k] = v
+      }
+      formOut.textContent = JSON.stringify(data, null, 2)
+    })
+    form.addEventListener('reset', () => { formOut.textContent = 'FormData will appear here…' })
+  </script>
+</body>
+</html>

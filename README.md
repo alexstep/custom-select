@@ -11,7 +11,7 @@ A `<select>` replacement as a native web component. No dependencies, no build st
 - Single & multiple selection, option groups, built-in filter, async search.
 - Themeable with plain CSS variables. Optional Shadow DOM isolation.
 
-[Live demo](demo.html) · ~10 KB initial gzipped (entry JS + CSS, see [Size](#size)).
+[Live demo](https://alexstep.github.io/custom-select/demo.html) · ~10 KB initial gzipped (entry JS + CSS, see [Size](#size)).
 
 ## Install
 

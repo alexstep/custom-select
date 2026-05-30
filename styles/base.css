@@ -32,6 +32,10 @@ custom-select {
   -webkit-tap-highlight-color: transparent;
   -webkit-touch-callout: none;
 
+  &.loading {
+    cursor: progress;
+  }
+
   /* Клавиатурный фокус (Tab): кольцо на триггере, не при клике мышью */
   &:focus-visible:not(.cs-disabled):not([disabled]) > label {
     outline: 2px solid var(--cs-focus-ring);
@@ -371,6 +375,47 @@ custom-select {
    */
 }
 
+@keyframes cs-search-spin {
+  to {
+    transform: translateY(-50%) rotate(360deg);
+  }
+}
+
+.cs-filter-container,
+.cs-mobile-filter-container {
+  position: relative;
+}
+
+.cs-search-spinner {
+  position: absolute;
+  right: 0.625rem;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 0.875rem;
+  height: 0.875rem;
+  border: 2px solid color-mix(in srgb, var(--cs-muted-text, #999) 35%, transparent);
+  border-top-color: var(--cs-accent, var(--cs-text, currentColor));
+  border-radius: 50%;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s ease;
+  box-sizing: border-box;
+}
+
+.cs-filter-container.cs-is-loading .cs-search-spinner,
+.cs-mobile-filter-container.cs-is-loading .cs-search-spinner {
+  opacity: 1;
+  animation: cs-search-spin 0.65s linear infinite;
+}
+
+.cs-filter-container.cs-is-loading .cs-filter-input {
+  padding-right: 1.75rem;
+}
+
+.cs-mobile-filter-container.cs-is-loading .cs-mobile-filter-input {
+  padding-right: 2rem;
+}
+
 @media (prefers-reduced-motion: reduce) {
   custom-select,
   custom-select * {
@@ -379,5 +424,11 @@ custom-select {
 
   custom-select > label::after {
     transition: transform 0.2s ease !important;
+  }
+
+  .cs-search-spinner {
+    animation: none !important;
+    opacity: 1;
+    border-top-color: var(--cs-accent, var(--cs-text, currentColor));
   }
 }

@@ -12,10 +12,22 @@ export type CustomSelectTheme = 'light' | 'dark' | 'auto'
 
 export type CustomSelectMobileView = 'native' | 'native-multiple' | 'sheet' | 'desktop'
 
+export type CustomSelectSearchMode = 'local' | 'remote'
+
 export interface CustomSelectSearchContext {
   signal: AbortSignal
 }
 
+/**
+ * Async search callback.
+ *
+ * - In `local` mode (default) return the subset of the already-declared options
+ *   that match the query (matching is done by `value`); options the server does
+ *   not know about stay hidden.
+ * - In `remote` mode (`search-mode="remote"`) return the full list to display;
+ *   items that were never present as `<option>` children are rendered and, once
+ *   chosen, registered on the component.
+ */
 export type CustomSelectSearchHandler = (
   query: string,
   context: CustomSelectSearchContext
@@ -50,9 +62,13 @@ declare class CustomSelect extends HTMLElement {
   mobileview: CustomSelectMobileView
   searchable: boolean
   searchPlaceholder: string
+  searchMode: CustomSelectSearchMode
+  readonly searchModes: readonly CustomSelectSearchMode[]
   onsearch: CustomSelectSearchHandler | null
   disabled: boolean
   useShadowDom: boolean
+  /** Disable the bottom-sheet history.pushState/back hash side effect. */
+  noSheetHistory: boolean
 
   /** @internal popup element (light DOM) */
   $popup: HTMLDialogElement | null

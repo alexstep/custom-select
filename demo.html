@@ -230,6 +230,14 @@
         <div class="out" data-out="user">No selection</div>
       </section>
 
+      <!-- Remote search -->
+      <section class="card">
+        <h2>Remote search</h2>
+        <p class="hint"><code>search-mode="remote"</code>: results come entirely from the server, including options that were never declared.</p>
+        <custom-select id="remoteSel" name="lang" searchable search-mode="remote" search-placeholder="Search languages…" placeholder="Search a language…"></custom-select>
+        <div class="out" data-out="lang">No selection</div>
+      </section>
+
       <!-- Grouped -->
       <section class="card">
         <h2>Grouped</h2>
@@ -346,6 +354,29 @@
         setTimeout(() => {
           const q = query.toLowerCase()
           resolve(all.filter(o => o.label.toLowerCase().includes(q)))
+        }, 400)
+      })
+
+    // ----- Remote search (results come from the "server") -----
+    const remoteSel = document.getElementById('remoteSel')
+    const remoteData = [
+      { value: 'js', label: 'JavaScript' },
+      { value: 'ts', label: 'TypeScript' },
+      { value: 'py', label: 'Python' },
+      { value: 'rs', label: 'Rust' },
+      { value: 'go', label: 'Go' },
+      { value: 'rb', label: 'Ruby' },
+      { value: 'kt', label: 'Kotlin' },
+      { value: 'swift', label: 'Swift' },
+      { value: 'ex', label: 'Elixir' },
+      { value: 'zig', label: 'Zig' },
+    ]
+    remoteSel.onsearch = (query, { signal }) =>
+      new Promise((resolve, reject) => {
+        signal?.addEventListener('abort', () => reject(new DOMException('Aborted', 'AbortError')))
+        setTimeout(() => {
+          const q = query.toLowerCase()
+          resolve(remoteData.filter(o => o.label.toLowerCase().includes(q)))
         }, 400)
       })
 

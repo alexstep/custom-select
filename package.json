@@ -42,6 +42,7 @@
     "types/"
   ],
   "devDependencies": {
+    "@happy-dom/global-registrator": "20.9.0",
     "typescript": "^5.7.0"
   },
   "sideEffects": [
@@ -56,7 +57,7 @@
     "prepublishOnly": "npm run build",
     "types:check": "tsc -p tsconfig.declarations.json --noEmit",
     "types:emit-from-js": "tsc -p tsconfig.types.json",
-    "test": "node -e \"console.log('no tests yet')\""
+    "test": "bun test"
   },
   "repository": {
     "type": "git",

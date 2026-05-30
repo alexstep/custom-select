@@ -23,7 +23,22 @@ import { debounce, lockScroll, unlockScroll } from './utils/dom.js'
 // CustomSelect Web Component class definition
 const CustomSelect = class extends HTMLElement {
   static formAssociated = true
-  static observedAttributes = ['name', 'value', 'multiple', 'placeholder', 'theme', 'mobileview', 'noscroll', 'searchable', 'search-placeholder', 'onsearch', 'disabled', 'shadow-dom']
+  static observedAttributes = [
+    'name',
+    'value',
+    'multiple',
+    'placeholder',
+    'theme',
+    'mobileview',
+    'noscroll',
+    'searchable',
+    'search-placeholder',
+    'search-mode',
+    'onsearch',
+    'disabled',
+    'shadow-dom',
+    'no-sheet-history',
+  ]
 
   #internals = null
   #core = null
@@ -37,8 +52,10 @@ const CustomSelect = class extends HTMLElement {
   #searchable = false
   #searchPlaceholder = ''
   #onsearch = null
+  #searchMode = 'local'
   #disabled = false
   #useShadowDom = false
+  #noSheetHistory = false
   #previousFocus = null
   #initializing = true
 
@@ -180,6 +197,30 @@ const CustomSelect = class extends HTMLElement {
     this.#onsearch = typeof v === 'function' ? v : null
   }
 
+  get searchModes() {
+    return ['local', 'remote']
+  }
+  get searchMode() {
+    return this.#searchMode
+  }
+  set searchMode(v) {
+    this.#searchMode = v === 'remote' ? 'remote' : 'local'
+  }
+
+  get noSheetHistory() {
+    return this.#noSheetHistory
+  }
+  set noSheetHistory(v) {
+    const next = !!v
+    if (this.#noSheetHistory === next) return
+    this.#noSheetHistory = next
+    if (next) {
+      this.setAttribute('no-sheet-history', '')
+    } else {
+      this.removeAttribute('no-sheet-history')
+    }
+  }
+
   get disabled() {
     return this.#disabled
   }
@@ -235,6 +276,10 @@ const CustomSelect = class extends HTMLElement {
       this.searchable = this.hasAttribute('searchable')
     } else if (name === 'search-placeholder') {
       this.searchPlaceholder = newValue
+    } else if (name === 'search-mode') {
+      this.searchMode = newValue
+    } else if (name === 'no-sheet-history') {
+      this.noSheetHistory = this.hasAttribute('no-sheet-history')
     } else if (name === 'onsearch') {
       // onsearch is handled via property, not attribute parsing
       // The attribute is just for observation
@@ -297,7 +342,13 @@ const CustomSelect = class extends HTMLElement {
     )
 
     if (this.#optionWatcher) {
-      this.#optionWatcher.observe(this, { childList: true, subtree: true })
+      this.#optionWatcher.observe(this, {
+        childList: true,
+        subtree: true,
+        attributes: true,
+        characterData: true,
+        attributeFilter: ['value', 'selected', 'disabled', 'label'],
+      })
     }
 
     // Initialize disabled state
@@ -340,6 +391,7 @@ const CustomSelect = class extends HTMLElement {
   disconnectedCallback() {
     this.#clearPopupListeners()
     this.labelClickListener?.()
+    this.#optionWatcher?.cancel?.()
     this.#optionWatcher?.disconnect()
     this.#typeaheadCleanup?.()
 
@@ -605,6 +657,39 @@ const CustomSelect = class extends HTMLElement {
 
       .cs-popup .cs-filter-input::placeholder {
         opacity: 0.5;
+      }
+
+      .cs-popup .cs-filter-container {
+        position: relative;
+      }
+
+      .cs-popup .cs-search-spinner {
+        position: absolute;
+        right: 0.625rem;
+        top: 50%;
+        transform: translateY(-50%);
+        width: 0.875rem;
+        height: 0.875rem;
+        border: 2px solid rgba(128, 128, 128, 0.35);
+        border-top-color: var(--cs-accent-bg, #007AFF);
+        border-radius: 50%;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.15s ease;
+        box-sizing: border-box;
+      }
+
+      .cs-popup .cs-filter-container.cs-is-loading .cs-search-spinner {
+        opacity: 1;
+        animation: cs-search-spin 0.65s linear infinite;
+      }
+
+      .cs-popup .cs-filter-container.cs-is-loading .cs-filter-input {
+        padding-right: 1.75rem;
+      }
+
+      @keyframes cs-search-spin {
+        to { transform: translateY(-50%) rotate(360deg); }
       }
 
       /* === LIST STYLES === */
@@ -1069,7 +1154,11 @@ const CustomSelect = class extends HTMLElement {
 
     const gestures = setupMobileSheetGestures(modal, {
       multiple: this.multiple,
-      onSelect: value => {
+      useSheetHistory: !this.#noSheetHistory,
+      searchMode: this.#searchMode,
+      onSearch: this.#onsearch,
+      onSelect: (value, label) => {
+        this.#ensureItem(value, label)
         if (this.multiple) {
           // Toggle value in array
           let currentValue = Array.isArray(this.value) ? [...this.value] : []
@@ -1214,7 +1303,12 @@ const CustomSelect = class extends HTMLElement {
     this.$popup.querySelectorAll('.cs-filter-container').forEach(el => el.remove())
     const filterUnsubscribe = setupFilter(this.$popup, {
       searchable: this.#searchable,
+      searchMode: this.#searchMode,
       onSearch: this.#onsearch,
+      onSelect: (value, item) => {
+        this.#ensureItem(value, item?.label ?? item?.labelText)
+        this.#handleItemSelect(value)
+      },
       host: this,
     })
 
@@ -1287,6 +1381,21 @@ const CustomSelect = class extends HTMLElement {
   #isItemSelected(value) {
     const result = this.multiple ? (this.value || []).includes(value) : this.value === value
     return result
+  }
+
+  /**
+   * Make sure a value exists as an item before selecting it. Remote search can
+   * return options that were never declared as <option> children; this registers
+   * them so the label renders correctly and the value participates in the form.
+   * @param {string} value
+   * @param {string} [label]
+   */
+  #ensureItem(value, label) {
+    if (value === '' || value == null) return
+    const items = this.#core.getItems()
+    if (items.some(i => String(i.value) === String(value))) return
+    const text = label != null && label !== '' ? String(label) : String(value)
+    this.#core.setItems([...items, { group: null, value, label: text, labelText: text, disabled: false }])
   }
 
   /**

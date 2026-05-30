@@ -3,6 +3,12 @@
  * Handles parsing of <option> elements to internal item format
  */
 
+import { debounce } from '../utils/dom.js'
+
+// Elements that belong to the component's own rendered output. Mutations inside
+// them are produced by re-renders, not by the host app, so they must be ignored.
+const INTERNAL_RENDER_SELECTOR = 'label, select, dialog, .cs-popup, .cs-mobile-dialog'
+
 /**
  * Parse <option> elements from a custom-select element
  * @param {HTMLElement} selectElement - The custom-select element
@@ -42,25 +48,90 @@ export function parseOptions(selectElement, onValueChange) {
 }
 
 /**
- * Set up mutation observer to watch for option changes
+ * Whether a node is part of the component's own rendered output.
+ * @param {Node | null} node
+ * @returns {boolean}
+ */
+function isInternalNode(node) {
+  if (!node) return false
+  const el = node.nodeType === 1 ? /** @type {Element} */ (node) : node.parentElement
+  return !!el?.closest?.(INTERNAL_RENDER_SELECTOR)
+}
+
+/**
+ * Whether a node is an <option> or <optgroup> element.
+ * @param {Node | null} node
+ * @returns {boolean}
+ */
+function isOptionLike(node) {
+  if (!node || node.nodeType !== 1) return false
+  const tag = /** @type {Element} */ (node).tagName?.toLowerCase()
+  return tag === 'option' || tag === 'optgroup'
+}
+
+/**
+ * Decide whether a single mutation reflects a host-driven option change
+ * (and not the component's internal rendering).
+ * @param {MutationRecord} mutation
+ * @returns {boolean}
+ */
+function isRelevantMutation(mutation) {
+  const { type, target } = mutation
+
+  if (type === 'attributes') {
+    // value / selected / disabled / label changed on an external option(group)
+    return isOptionLike(target) && !isInternalNode(target)
+  }
+
+  if (type === 'characterData') {
+    // Text of an external <option> changed
+    const parent = target.parentElement
+    return isOptionLike(parent) && !isInternalNode(parent)
+  }
+
+  if (type === 'childList') {
+    // option(group) added or removed outside the rendered tree...
+    for (const node of [...mutation.addedNodes, ...mutation.removedNodes]) {
+      if (isOptionLike(node) && !isInternalNode(node)) return true
+    }
+    // ...or text added/removed directly inside an external <option>
+    return isOptionLike(target) && !isInternalNode(target)
+  }
+
+  return false
+}
+
+/**
+ * Set up a mutation observer that mirrors native <select> behaviour: it reacts
+ * to options being added, removed, reordered, or having their text, value,
+ * selected, disabled or optgroup label changed. Re-renders triggered by the
+ * component itself are filtered out, and the callback is debounced so a burst
+ * of mutations only rebuilds once.
+ *
  * @param {HTMLElement} selectElement - The custom-select element
  * @param {Function} onOptionsChange - Callback when options change
  * @param {Function} isRenderingFn - Function to check if currently rendering
- * @returns {MutationObserver} The observer instance
+ * @param {number} [debounceMs=50] - Debounce window for the rebuild callback
+ * @returns {(MutationObserver & { cancel?: () => void }) | null} The observer instance
  */
-export function setupOptionWatcher(selectElement, onOptionsChange, isRenderingFn) {
+export function setupOptionWatcher(selectElement, onOptionsChange, isRenderingFn, debounceMs = 50) {
   try {
-    return new MutationObserver(([{ addedNodes }]) => {
+    const scheduleChange = debounce(() => {
       if (isRenderingFn()) return
-
-      const tagNames = new Set(Object.values(addedNodes).map(n => (n.tagName || n.nodeName).toLowerCase()))
-
-      if (tagNames.has('dialog') || !tagNames.has('option')) {
-        return // no re-render when html update from #render method
-      }
-
       onOptionsChange()
+    }, debounceMs)
+
+    const observer = new MutationObserver(mutations => {
+      if (isRenderingFn()) return
+      if (mutations.some(isRelevantMutation)) {
+        scheduleChange()
+      }
     })
+
+    // Expose cancel so callers can flush the pending rebuild on disconnect.
+    const watcher = /** @type {MutationObserver & { cancel: () => void }} */ (observer)
+    watcher.cancel = scheduleChange.cancel
+    return watcher
   } catch {
     return null
   }

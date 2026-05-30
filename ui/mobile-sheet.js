@@ -3,7 +3,7 @@
  * Provides slide-up animations and drag-to-dismiss functionality
  */
 
-import { lockScroll, unlockScroll } from '../utils/dom.js'
+import { lockScroll, unlockScroll, appendSearchSpinner, setRemoteSearchLoading } from '../utils/dom.js'
 
 const CS_THEME_VARS = [
   '--cs-bg',
@@ -65,6 +65,7 @@ export async function createMobileSheet($select, items, groups) {
     filterInput.spellcheck = false
 
     filterContainer.appendChild(filterInput)
+    appendSearchSpinner(filterContainer)
     header.appendChild(filterContainer)
   }
 
@@ -129,16 +130,70 @@ export async function createMobileSheet($select, items, groups) {
 }
 
 export function setupMobileSheetGestures(modal, callbacks = {}) {
-  const { onSelect, onClose, onOpen, multiple = false } = callbacks
+  const { onSelect, onClose, onOpen, multiple = false, useSheetHistory = true, onSearch = null, searchMode = 'local' } = callbacks
+  const isRemote = searchMode === 'remote' && typeof onSearch === 'function'
   const sheet = modal.querySelector('.cs-mobile-sheet')
   const list = modal.querySelector('.cs-mobile-sheet-list')
   const filterInput = modal.querySelector('.cs-mobile-filter-input')
+  const filterContainer = modal.querySelector('.cs-mobile-filter-container')
+  const hostSelect = modal.__csSelect
+
+  const setLoading = loading =>
+    setRemoteSearchLoading({
+      host: hostSelect,
+      container: filterContainer,
+      loading,
+    })
 
   let startY = 0
   let currentY = 0
   let isDragging = false
   let allItems = []
   let filterTimeout = null
+
+  // Remote search swaps the rendered list out for the server's results.
+  let remoteActive = false
+  let remoteSnapshot = null
+  let remoteAbort = null
+
+  function escapeRegExp(value) {
+    return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  }
+
+  function restoreRemoteList() {
+    if (!remoteActive || !remoteSnapshot) return
+    list.replaceChildren(...remoteSnapshot)
+    remoteActive = false
+    allItems = Array.from(list.querySelectorAll('.cs-mobile-sheet-item'))
+  }
+
+  function renderRemoteList(results, query) {
+    if (!remoteActive) {
+      remoteSnapshot = Array.from(list.children)
+      remoteActive = true
+    }
+    list.replaceChildren()
+    results.forEach((item, index) => {
+      const li = document.createElement('li')
+      li.className = 'cs-mobile-sheet-item'
+      li.setAttribute('role', 'option')
+      li.dataset.value = String(item.value)
+      li.id = `mobile-remote-item-${index}`
+      if (item.disabled) li.classList.add('disabled')
+
+      const span = document.createElement('span')
+      const text = String(item.label ?? item.value)
+      if (query) {
+        const regex = new RegExp(`(${escapeRegExp(query)})`, 'gi')
+        span.innerHTML = text.replace(regex, '<mark>$1</mark>')
+      } else {
+        span.textContent = text
+      }
+      li.appendChild(span)
+      list.appendChild(li)
+    })
+    allItems = Array.from(list.querySelectorAll('.cs-mobile-sheet-item'))
+  }
 
   let isHistoryPushed = false
   const historyId = `mobile-sheet-${Math.random().toString(36).substr(2, 9)}`
@@ -197,8 +252,35 @@ export function setupMobileSheetGestures(modal, callbacks = {}) {
   // Debounced filter handler
   function handleFilterInput() {
     clearTimeout(filterTimeout)
-    filterTimeout = setTimeout(() => {
+    filterTimeout = setTimeout(async () => {
       const query = filterInput.value.trim()
+
+      if (isRemote) {
+        if (!query) {
+          if (remoteAbort) remoteAbort.abort()
+          setLoading(false)
+          restoreRemoteList()
+          allItems.forEach(item => {
+            item.style.display = ''
+          })
+          return
+        }
+        setLoading(true)
+        try {
+          if (remoteAbort) remoteAbort.abort()
+          remoteAbort = new AbortController()
+          const results = await onSearch(query, { signal: remoteAbort.signal })
+          renderRemoteList(results || [], query)
+        } catch (error) {
+          if (error.name === 'AbortError') return
+          console.error('Async search failed:', error)
+          filterItems(query)
+        } finally {
+          setLoading(false)
+        }
+        return
+      }
+
       filterItems(query)
     }, 200)
   }
@@ -211,10 +293,14 @@ export function setupMobileSheetGestures(modal, callbacks = {}) {
     // Ensure open attribute is set for CSS styling
     modal.setAttribute('open', '')
 
-    // Push to history for back button support
-    history.pushState({ id: historyId }, '', '#custom-select-open')
-    isHistoryPushed = true
-    window.addEventListener('popstate', handlePopstate)
+    // Push to history for back button support (opt-out via no-sheet-history).
+    // Mutating the URL hash is surprising inside hash routers, Telegram Mini
+    // Apps, and deep-link setups, so it can be disabled.
+    if (useSheetHistory) {
+      history.pushState({ id: historyId }, '', '#custom-select-open')
+      isHistoryPushed = true
+      window.addEventListener('popstate', handlePopstate)
+    }
 
     // Initialize items array for filtering
     allItems = Array.from(list.querySelectorAll('.cs-mobile-sheet-item'))
@@ -294,15 +380,16 @@ export function setupMobileSheetGestures(modal, callbacks = {}) {
     if (!item || item.classList.contains('disabled')) return
 
     const value = item.dataset.value
+    const label = item.querySelector('span')?.textContent?.trim()
 
     if (multiple) {
       // Toggle visual state for multiple selection
       item.classList.toggle('selected')
       item.setAttribute('aria-selected', item.classList.contains('selected'))
-      if (onSelect) onSelect(value)
+      if (onSelect) onSelect(value, label)
       // Don't hide for multiple - user continues selecting
     } else {
-      if (onSelect) onSelect(value)
+      if (onSelect) onSelect(value, label)
       hide()
     }
   }
@@ -373,6 +460,8 @@ export function setupMobileSheetGestures(modal, callbacks = {}) {
         filterInput.removeEventListener('input', handleFilterInput)
       }
       clearTimeout(filterTimeout)
+      if (remoteAbort) remoteAbort.abort()
+      setLoading(false)
 
       window.removeEventListener('popstate', handlePopstate)
 

@@ -3,7 +3,7 @@
  * Provides search functionality within select options (lazy loaded)
  */
 
-import { debounce } from '../utils/dom.js'
+import { appendSearchSpinner, debounce, setRemoteSearchLoading } from '../utils/dom.js'
 
 /**
  * Create filter input element with highlighting support
@@ -21,6 +21,7 @@ export function createFilterInput(placeholder = 'Search...', options = {}) {
   input.className = 'cs-filter-input'
 
   container.appendChild(input)
+  appendSearchSpinner(container)
   return container
 }
 
@@ -49,7 +50,8 @@ export function highlightMatches(text, query) {
  * @returns {Function} Cleanup function
  */
 export function setupFilter($popup, $items, options = {}) {
-  const { placeholder, onFilter, onSearch, host } = options
+  const { placeholder, onFilter, onSearch, onSelect, host, searchMode = 'local' } = options
+  const isRemote = searchMode === 'remote' && typeof onSearch === 'function'
 
   // Ensure we don't add multiple filter inputs
   $popup.querySelectorAll('.cs-filter-container').forEach(el => el.remove())
@@ -64,8 +66,82 @@ export function setupFilter($popup, $items, options = {}) {
   const $input = filterContainer.querySelector('input')
   const originalItems = [...$items]
   let currentQuery = ''
-  let _isAsyncLoading = false
   let currentAbortController = null
+
+  const setLoading = loading => setRemoteSearchLoading({ host, container: filterContainer, loading })
+
+  // --- Remote mode: results replace the rendered list entirely ---------------
+  // The server may return options that were never present as <option> children,
+  // so in remote mode we render the returned items directly instead of filtering
+  // the existing DOM.
+  let remoteActive = false
+  let originalSnapshot = null
+  /** @type {Array<() => void>} */
+  let remoteCleanups = []
+
+  const restoreOriginal = () => {
+    if (!remoteActive || !$ul) return
+    for (const fn of remoteCleanups) fn()
+    remoteCleanups = []
+    $ul.replaceChildren(...originalSnapshot)
+    remoteActive = false
+  }
+
+  const renderRemoteResults = (results, query) => {
+    if (!$ul) return
+    if (!remoteActive) {
+      originalSnapshot = Array.from($ul.children)
+      remoteActive = true
+    }
+    for (const fn of remoteCleanups) fn()
+    remoteCleanups = []
+    $ul.replaceChildren()
+
+    results.forEach((item, index) => {
+      const li = document.createElement('li')
+      li.setAttribute('role', 'option')
+      li.setAttribute('aria-selected', 'false')
+      li.dataset.value = String(item.value)
+      li.dataset.remote = 'true'
+      li.id = `remote-item-${index}`
+      li.tabIndex = -1
+      if (item.disabled) {
+        li.setAttribute('disabled', '')
+        li.setAttribute('aria-disabled', 'true')
+      }
+      li.innerHTML = item.highlightedLabel || highlightMatches(String(item.label ?? item.value), query)
+
+      const onClick = () => {
+        if (item.disabled) return
+        onSelect?.(String(item.value), item)
+      }
+      li.addEventListener('click', onClick)
+      remoteCleanups.push(() => li.removeEventListener('click', onClick))
+      $ul.appendChild(li)
+    })
+
+    onFilter?.(results.length, results.length)
+  }
+
+  // Basic keyboard support for the remote list (the popup's own navigation is
+  // bound to the original options, which are detached while remote is active).
+  const ulKeydown = e => {
+    if (!remoteActive || !$ul) return
+    const lis = Array.from($ul.querySelectorAll('li[data-remote]'))
+    if (!lis.length) return
+    const idx = lis.indexOf(document.activeElement)
+    if (e.key === 'ArrowDown') {
+      e.preventDefault()
+      lis[Math.min(lis.length - 1, idx + 1)]?.focus()
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault()
+      lis[idx <= 0 ? 0 : idx - 1]?.focus()
+    } else if (e.key === 'Enter' && idx >= 0) {
+      e.preventDefault()
+      lis[idx].click()
+    }
+  }
+  if (isRemote && $ul) $ul.addEventListener('keydown', ulKeydown)
 
   // Debounced filter handler (200ms)
   const debouncedFilter = debounce(async () => {
@@ -83,6 +159,10 @@ export function setupFilter($popup, $items, options = {}) {
     }
 
     if (!query) {
+      if (currentAbortController) currentAbortController.abort()
+      setLoading(false)
+      // Restore the original rendered list (remote mode swaps it out)
+      restoreOriginal()
       // Show all items, clear highlighting
       originalItems.forEach(item => {
         item.style.display = ''
@@ -92,12 +172,41 @@ export function setupFilter($popup, $items, options = {}) {
       return
     }
 
-    // Async search if callback provided
+    // Remote mode: render whatever the server returns as the visible list
+    if (isRemote) {
+      setLoading(true)
+      try {
+        if (currentAbortController) currentAbortController.abort()
+        currentAbortController = new AbortController()
+
+        const results = await onSearch(query, { signal: currentAbortController.signal })
+
+        // Ignore stale responses
+        if (currentQuery !== query) return
+
+        renderRemoteResults(results || [], query)
+
+        if (host) {
+          host.dispatchEvent(
+            new CustomEvent('filter-change', {
+              detail: { query, results: results || [] },
+              bubbles: false,
+            })
+          )
+        }
+      } catch (error) {
+        if (error.name === 'AbortError') return
+        console.error('Async search failed:', error)
+        performLocalFilter(query)
+      } finally {
+        setLoading(false)
+      }
+      return
+    }
+
+    // Async search if callback provided (local mode: intersect with existing options)
     if (onSearch) {
       try {
-        _isAsyncLoading = true
-        $input.style.opacity = '0.7' // Visual loading indicator
-
         // Cancel previous request
         if (currentAbortController) currentAbortController.abort()
         currentAbortController = new AbortController()
@@ -143,9 +252,6 @@ export function setupFilter($popup, $items, options = {}) {
         console.error('Async search failed:', error)
         // Fallback to local filtering
         performLocalFilter(query)
-      } finally {
-        _isAsyncLoading = false
-        $input.style.opacity = '1'
       }
     } else {
       // Local filtering
@@ -207,6 +313,9 @@ export function setupFilter($popup, $items, options = {}) {
   return () => {
     debouncedFilter.cancel?.() // Cancel any pending debounced calls
     if (currentAbortController) currentAbortController.abort() // Cancel any pending async requests
+    setLoading(false)
+    if (isRemote && $ul) $ul.removeEventListener('keydown', ulKeydown)
+    restoreOriginal() // Put the original options back if remote replaced them
     $input.removeEventListener('input', debouncedFilter)
     filterContainer.remove()
   }

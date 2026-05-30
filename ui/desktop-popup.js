@@ -163,11 +163,13 @@ export function setupKeyboard($dialog, callbacks) {
  * @param {Object} options - Filter options
  * @param {boolean} options.searchable - Whether filter is enabled
  * @param {Function} options.onSearch - Async search callback
+ * @param {Function} [options.onSelect] - Called when a remote result is picked
+ * @param {string} [options.searchMode] - 'local' | 'remote'
  * @param {HTMLElement} options.host - Host element for events
  * @returns {Function} cleanup function
  */
 export function setupFilter($dialog, options = {}) {
-  const { searchable, onSearch, host } = options
+  const { searchable, onSearch, onSelect, searchMode, host } = options
 
   if (!searchable) {
     return () => {} // No-op cleanup
@@ -183,6 +185,8 @@ export function setupFilter($dialog, options = {}) {
       filterCleanup = setupFilterModule($dialog, $items, {
         placeholder: 'Search...',
         onSearch,
+        onSelect,
+        searchMode,
         host,
       })
     })

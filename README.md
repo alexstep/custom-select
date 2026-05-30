@@ -23,6 +23,13 @@ npm install pure-custom-select
 import 'pure-custom-select' // registers <custom-select>
 ```
 
+Registration is idempotent. Importing the package more than once (HMR, micro-frontends, several copies of the package) will not throw `NotSupportedError`; the duplicate `define` is skipped. To register under a different tag name, call the exported helper:
+
+```js
+import { defineCustomSelect } from 'pure-custom-select'
+defineCustomSelect('my-select') // returns true if it registered, false if already defined
+```
+
 Or without a bundler (pre-built `dist/`, all chunk files must be reachable):
 
 ```html
@@ -33,11 +40,13 @@ Or without a bundler (pre-built `dist/`, all chunk files must be reachable):
 </script>
 ```
 
-If you import the class yourself, register it manually:
+If you import the class yourself, register it manually (guard against a double `define`):
 
 ```js
 import CustomSelect from 'pure-custom-select/custom-select.js'
-customElements.define('custom-select', CustomSelect)
+if (!customElements.get('custom-select')) {
+  customElements.define('custom-select', CustomSelect)
+}
 ```
 
 Styles are imported by `index.js`. When loading files directly, include them yourself:
@@ -88,13 +97,28 @@ el.items = [
 ]
 ```
 
-Async search (return the matching subset for the current query):
+Async search has two modes.
+
+Local (default) — `onsearch` returns the subset of the **already-declared** options that match. Matching is done by `value`, so options the server does not know about stay hidden:
 
 ```js
 el.searchable = true
 el.onsearch = async (query, { signal }) => {
   const res = await fetch(`/api/search?q=${query}`, { signal })
-  return res.json() // [{ value, label }]
+  return res.json() // [{ value }] referencing existing <option>s
+}
+```
+
+Remote (`search-mode="remote"`) — `onsearch` returns the full list to display. Items that were never present as `<option>` children are rendered, and when one is picked it is registered on the component (label shown, value submitted with the form):
+
+```html
+<custom-select searchable search-mode="remote" name="city"></custom-select>
+```
+
+```js
+el.onsearch = async (query, { signal }) => {
+  const res = await fetch(`/api/cities?q=${query}`, { signal })
+  return res.json() // [{ value, label, disabled? }] — may include brand-new options
 }
 ```
 
@@ -228,9 +252,11 @@ watch(() => props.modelValue, syncToElement)
 | `mobileview` | `native` \| `native-multiple` \| `sheet` \| `desktop` | `native` | Mobile rendering mode. |
 | `searchable` | boolean | `false` | Adds a filter input to the popup. |
 | `search-placeholder` | string | `''` | Filter input placeholder. |
+| `search-mode` | `local` \| `remote` | `local` | `remote` renders `onsearch` results wholesale (see [Async search](#frameworks-react-angular-vue)). |
 | `disabled` | boolean | `false` | Blocks interaction. |
 | `noscroll` | boolean | `false` | Disables popup internal scroll. |
 | `shadow-dom` | boolean | `false` | Render inside a Shadow DOM. |
+| `no-sheet-history` | boolean | `false` | Disables the mobile sheet's `history.pushState` back-button integration. |
 
 Property-only:
 
@@ -238,8 +264,11 @@ Property-only:
 | --- | --- | --- |
 | `items` | `{value, label, disabled?, labelText?}[]` | Set options from JS. |
 | `onsearch` | `(query, {signal}) => Promise<items>` | Async search callback. |
+| `searchMode` | `'local' \| 'remote'` | Mirrors the `search-mode` attribute. |
+| `noSheetHistory` | boolean | Mirrors the `no-sheet-history` attribute. |
 | `themes` | string[] | Available themes (read-only). |
 | `mobileviews` | string[] | Available mobile modes (read-only). |
+| `searchModes` | string[] | Available search modes (read-only). |
 
 ### Events
 
@@ -249,6 +278,14 @@ Property-only:
 | `popup-open` | `{}` | Desktop popup opens. |
 | `popup-close` | `{}` | Desktop popup closes (cancelable). |
 | `filter-change` | `{ query, results }` | Filter input changes. |
+
+## Mobile bottom sheet
+
+On mobile, opening the sheet pushes a history entry (`#custom-select-open`) so the hardware back button closes it instead of navigating away. Inside a hash router, a Telegram Mini App, or a deep-link/analytics setup this hash change is an unexpected side effect. Disable it with `no-sheet-history`:
+
+```html
+<custom-select mobileview="sheet" no-sheet-history></custom-select>
+```
 
 ## Theming
 

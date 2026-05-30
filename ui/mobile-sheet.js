@@ -4,6 +4,7 @@
  */
 
 import { lockScroll, unlockScroll, appendSearchSpinner, setRemoteSearchLoading } from '../utils/dom.js'
+import { appendHighlightedText, setPlainText } from '../utils/highlight.js'
 
 const CS_THEME_VARS = [
   '--cs-bg',
@@ -156,10 +157,6 @@ export function setupMobileSheetGestures(modal, callbacks = {}) {
   let remoteSnapshot = null
   let remoteAbort = null
 
-  function escapeRegExp(value) {
-    return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-  }
-
   function restoreRemoteList() {
     if (!remoteActive || !remoteSnapshot) return
     list.replaceChildren(...remoteSnapshot)
@@ -182,13 +179,7 @@ export function setupMobileSheetGestures(modal, callbacks = {}) {
       if (item.disabled) li.classList.add('disabled')
 
       const span = document.createElement('span')
-      const text = String(item.label ?? item.value)
-      if (query) {
-        const regex = new RegExp(`(${escapeRegExp(query)})`, 'gi')
-        span.innerHTML = text.replace(regex, '<mark>$1</mark>')
-      } else {
-        span.textContent = text
-      }
+      appendHighlightedText(span, String(item.label ?? item.value), query)
       li.appendChild(span)
       list.appendChild(li)
     })
@@ -219,10 +210,9 @@ export function setupMobileSheetGestures(modal, callbacks = {}) {
 
       if (label) {
         if (isFiltered && matches) {
-          const regex = new RegExp(`(${query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi')
-          label.innerHTML = label.textContent.replace(regex, '<mark>$1</mark>')
+          appendHighlightedText(label, label.textContent ?? '', query)
         } else {
-          label.innerHTML = label.textContent
+          setPlainText(label, label.textContent ?? '')
         }
       }
     })

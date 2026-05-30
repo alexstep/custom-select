@@ -4,6 +4,7 @@
  */
 
 import { appendSearchSpinner, debounce, setRemoteSearchLoading } from '../utils/dom.js'
+import { appendHighlightedText, setPlainText } from '../utils/highlight.js'
 
 /**
  * Create filter input element with highlighting support
@@ -26,16 +27,12 @@ export function createFilterInput(placeholder = 'Search...', options = {}) {
 }
 
 /**
- * Highlight text matches in a string
- * @param {string} text - Original text
- * @param {string} query - Search query
- * @returns {string} HTML with highlighted matches
+ * @param {ParentNode} parent
+ * @param {string} text
+ * @param {string} query
  */
-export function highlightMatches(text, query) {
-  if (!query.trim()) return text
-
-  const regex = new RegExp(`(${query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi')
-  return text.replace(regex, '<mark>$1</mark>')
+export function renderHighlightedLabel(parent, text, query) {
+  appendHighlightedText(parent, text, query)
 }
 
 /**
@@ -109,7 +106,7 @@ export function setupFilter($popup, $items, options = {}) {
         li.setAttribute('disabled', '')
         li.setAttribute('aria-disabled', 'true')
       }
-      li.innerHTML = item.highlightedLabel || highlightMatches(String(item.label ?? item.value), query)
+      renderHighlightedLabel(li, String(item.label ?? item.value), query)
 
       const onClick = () => {
         if (item.disabled) return
@@ -166,7 +163,7 @@ export function setupFilter($popup, $items, options = {}) {
       // Show all items, clear highlighting
       originalItems.forEach(item => {
         item.style.display = ''
-        item.innerHTML = item.textContent // Remove any highlighting
+        setPlainText(item, item.textContent ?? '')
       })
       onFilter?.(originalItems.length, originalItems.length)
       return
@@ -228,7 +225,7 @@ export function setupFilter($popup, $items, options = {}) {
           item.style.display = matches ? '' : 'none'
           if (matches) {
             // Apply highlighting if result has highlighted text
-            item.innerHTML = resultItem.highlightedLabel || highlightMatches(item.textContent, query)
+            renderHighlightedLabel(item, item.textContent ?? '', query)
             visibleCount++
           }
         })
@@ -270,7 +267,7 @@ export function setupFilter($popup, $items, options = {}) {
 
       item.style.display = matches ? '' : 'none'
       if (matches) {
-        item.innerHTML = highlightMatches(item.textContent, query)
+        renderHighlightedLabel(item, item.textContent ?? '', query)
         visibleCount++
       }
     })
@@ -328,18 +325,12 @@ export function setupFilter($popup, $items, options = {}) {
  * @param {boolean} highlight - Whether to add highlighting
  * @returns {Array} Filtered items
  */
-export function filterItems(items, query, highlight = false) {
+export function filterItems(items, query) {
   if (!query.trim()) return items
 
   const searchTerm = query.toLowerCase()
   return items.filter(item => {
     const text = (item.label || item.labelText || '').toLowerCase()
-    const matches = text.includes(searchTerm)
-
-    if (matches && highlight) {
-      item.highlightedLabel = highlightMatches(item.label || item.labelText, query)
-    }
-
-    return matches
+    return text.includes(searchTerm)
   })
 }

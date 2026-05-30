@@ -1,18 +1,26 @@
 import './setup.js'
 import { describe, expect, it } from 'bun:test'
-import { filterItems, highlightMatches, setupFilter } from '../filter/filter-module.js'
+import { appendHighlightedText } from '../utils/highlight.js'
+import { filterItems, setupFilter } from '../filter/filter-module.js'
 
-describe('highlightMatches', () => {
-  it('wraps matches in <mark>', () => {
-    expect(highlightMatches('Hello World', 'wor')).toBe('Hello <mark>Wor</mark>ld')
+describe('appendHighlightedText', () => {
+  it('wraps matches in <mark> elements', () => {
+    const parent = document.createElement('span')
+    appendHighlightedText(parent, 'Hello World', 'wor')
+    expect(parent.innerHTML).toBe('Hello <mark>Wor</mark>ld')
   })
 
-  it('escapes regex special characters', () => {
-    expect(highlightMatches('a+b', '+')).toBe('a<mark>+</mark>b')
+  it('escapes regex special characters in the query', () => {
+    const parent = document.createElement('span')
+    appendHighlightedText(parent, 'a+b', '+')
+    expect(parent.innerHTML).toBe('a<mark>+</mark>b')
   })
 
-  it('returns the original text for an empty query', () => {
-    expect(highlightMatches('abc', '')).toBe('abc')
+  it('does not execute HTML from the source text', () => {
+    const parent = document.createElement('li')
+    appendHighlightedText(parent, '<img src=x onerror=alert(1)>', 'img')
+    expect(parent.querySelector('img')).toBeNull()
+    expect(parent.textContent).toBe('<img src=x onerror=alert(1)>')
   })
 })
 
@@ -58,6 +66,30 @@ describe('setupFilter remote mode', () => {
     const remoteLis = popup.querySelectorAll('li[data-remote]')
     expect(remoteLis.length).toBe(2)
     expect(remoteLis[0].dataset.value).toBe('remote1')
+    cleanup()
+  })
+
+  it('does not inject HTML from malicious remote labels', async () => {
+    const popup = makePopup()
+    const cleanup = setupFilter(popup, Array.from(popup.querySelectorAll('li')), {
+      searchMode: 'remote',
+      onSearch: async () => [
+        {
+          value: 'x',
+          label: '<img src=x onerror=window.__xss=1>',
+          highlightedLabel: '<script>window.__xss=1</script>',
+        },
+      ],
+      onSelect: () => {},
+    })
+
+    await type(popup, 'x')
+
+    const li = popup.querySelector('li[data-remote]')
+    expect(li?.querySelector('img')).toBeNull()
+    expect(li?.querySelector('script')).toBeNull()
+    expect(li?.textContent).toBe('<img src=x onerror=window.__xss=1>')
+    expect(globalThis.__xss).toBeUndefined()
     cleanup()
   })
 

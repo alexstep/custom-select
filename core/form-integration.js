@@ -31,6 +31,10 @@ export function setFormValue(internals, value, name) {
 
   try {
     if (Array.isArray(value)) {
+      if (!name) {
+        internals.setFormValue(null)
+        return
+      }
       const fd = new FormData()
       for (const v of [...new Set(value)]) {
         if (v !== '' && v != null) fd.append(name, v)
@@ -105,12 +109,12 @@ export function updateAriaAttributes(element, options = {}) {
 export function setupLabelAssociation(element, id, onLabelClick) {
   if (!id || element.dataset.mobile) return () => {}
 
-  const label = document.querySelector(`label[for="${id}"]`)
-  if (!label) return () => {}
+  const labels = document.querySelectorAll(`label[for="${CSS.escape(id)}"]`)
+  if (!labels.length) return () => {}
 
-  label.addEventListener('click', onLabelClick)
+  labels.forEach(label => label.addEventListener('click', onLabelClick))
 
   return () => {
-    label.removeEventListener('click', onLabelClick)
+    labels.forEach(label => label.removeEventListener('click', onLabelClick))
   }
 }

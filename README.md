@@ -248,7 +248,7 @@ watch(() => props.modelValue, syncToElement)
 | `value` | string \| string[] | `''` | Array when `multiple`. |
 | `multiple` | boolean | `false` | Multi-select. |
 | `placeholder` | string | `''` | Shown when nothing is selected. |
-| `theme` | `light` \| `dark` \| `auto` | `dark` | `auto` follows `prefers-color-scheme`. |
+| `theme` | `light` \| `dark` \| `auto` | `auto` | `auto` follows `prefers-color-scheme`. |
 | `mobileview` | `native` \| `native-multiple` \| `sheet` \| `desktop` | `native` | Mobile rendering mode. |
 | `searchable` | boolean | `false` | Adds a filter input to the popup. |
 | `search-placeholder` | string | `''` | Filter input placeholder. |

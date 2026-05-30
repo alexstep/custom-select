@@ -47,7 +47,7 @@ const CustomSelect = class extends HTMLElement {
 
   // Additional state not handled by core
   #name = ''
-  #theme = 'dark'
+  #theme = 'auto'
   #mobileview = 'native'
   #searchable = false
   #searchPlaceholder = ''

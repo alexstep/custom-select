@@ -326,15 +326,21 @@
     // ----- Theme switch -----
     const root = document.documentElement
     const sw = document.getElementById('themeSwitch')
+
+    function applyPageTheme(theme) {
+      root.dataset.theme = theme
+      sw.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.theme === theme)))
+      document.querySelectorAll('custom-select').forEach(s => { s.theme = theme })
+    }
+
     sw.addEventListener('click', e => {
       const btn = e.target.closest('button[data-theme]')
       if (!btn) return
-      const theme = btn.dataset.theme
-      root.dataset.theme = theme
-      sw.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(b === btn)))
-      // Forward theme to components so their popups match (esp. shadow DOM)
-      document.querySelectorAll('custom-select').forEach(s => { s.theme = theme })
+      applyPageTheme(btn.dataset.theme)
     })
+
+    // Sync components with the page theme on first paint (Auto is the default).
+    applyPageTheme(root.dataset.theme || 'auto')
 
     // ----- Live value output -----
     const fmt = v => Array.isArray(v) ? (v.length ? v.join(', ') : '—') : (v || '—')

@@ -294,6 +294,8 @@ const CustomSelect = class extends HTMLElement {
   }
 
   connectedCallback() {
+    this.removeAttribute('data-cs-ready')
+
     if (this.multiple) this.value = []
 
     // Initialize shadow root if enabled (must happen before any DOM manipulation)
@@ -389,6 +391,7 @@ const CustomSelect = class extends HTMLElement {
   }
 
   disconnectedCallback() {
+    this.removeAttribute('data-cs-ready')
     this.#clearPopupListeners()
     this.labelClickListener?.()
     this.#optionWatcher?.cancel?.()
@@ -846,6 +849,7 @@ const CustomSelect = class extends HTMLElement {
 
   #initRender() {
     this.#isRendering = true
+    this.removeAttribute('data-cs-ready')
 
     // Preserve popup if it's already open to avoid killing listeners
     const popupWasOpen = this.$popup?.open
@@ -854,6 +858,7 @@ const CustomSelect = class extends HTMLElement {
       this.#updatePopupItems().then(() => {
         this.#isRendering = false
         this.#updateValueDisplay()
+        this.setAttribute('data-cs-ready', '')
       })
       return
     }
@@ -887,6 +892,7 @@ const CustomSelect = class extends HTMLElement {
 
     this.#isRendering = false
     this.#updateValueDisplay()
+    this.setAttribute('data-cs-ready', '')
   }
 
   #updateRender() {

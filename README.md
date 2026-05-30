@@ -57,6 +57,8 @@ Styles are imported by `index.js`. When loading files directly, include them you
 <link rel="stylesheet" href="pure-custom-select/styles/mobile.css">
 ```
 
+**Load CSS before JS** when using `<script type="module">` or a CDN bundle. [`base.css`](styles/base.css) hides light-DOM `<option>` / `<optgroup>` and reserves trigger height until the element upgrades (`:not(:defined)`) and until the first render finishes (`:not([data-cs-ready])`) — this prevents a flash of expanded options and layout shift on slow connections. With a bundler, `import 'pure-custom-select'` pulls CSS in with the JS entry; for zero flash on first paint, add `<link rel="stylesheet" href="…/custom-select.min.css">` in `<head>` ahead of the module script.
+
 ## Usage
 
 ```html

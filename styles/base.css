@@ -21,6 +21,9 @@ custom-select {
    */
   --cs-svg-arrow: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m18.3 15.3.4-.4.4-1 0-1.4-4.9-4.9a2 2 0 0 0-2.8 0l-4.9 4.9a1 1 0 1 0 1.4 1.4l4.2-4.2a1 1 0 0 1 1.4 0l4.2 4.2c.4.4 1 .4 1.4 0z"/></svg>');
   --cs-svg-check: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M8.3 17a1.4 1.4 0 0 1-1.1-.5L3.6 11.7a1.4 1.4 0 0 1 2.2-1.7l2.4 3.1L14.1 3.6a1.4 1.4 0 0 1 2.4 1.5l-7 11.2a1.4 1.4 0 0 1-1.2.7z"/></svg>');
+  --cs-trigger-pad-y: 0.3125rem;
+  --cs-trigger-line: 1.5em;
+  --cs-trigger-height: calc(var(--cs-trigger-pad-y) * 2 + var(--cs-trigger-line) + 2px);
 
   display: inline-block;
   min-width: 3.75rem;
@@ -34,6 +37,38 @@ custom-select {
 
   &.loading {
     cursor: progress;
+  }
+
+  /*
+   * Authoring markup (<option>, <optgroup>) lives in light DOM until the
+   * element upgrades and finishes its first render. Hide options and reserve
+   * trigger height through both phases so there is no flash or layout shift.
+   */
+  &:not(:defined),
+  &:not([data-cs-ready]) {
+    display: block;
+    vertical-align: top;
+    min-height: var(--cs-trigger-height);
+    height: var(--cs-trigger-height);
+    overflow: hidden;
+    box-sizing: border-box;
+    border-radius: var(--cs-border-radius, 10px);
+    border: 1px solid var(--cs-border);
+    background: var(--cs-bg);
+
+    & > option,
+    & > optgroup {
+      display: none !important;
+    }
+  }
+
+  &[data-cs-ready] {
+    height: var(--cs-trigger-height);
+    min-height: var(--cs-trigger-height);
+    overflow: visible;
+    border: none;
+    background: transparent;
+    border-radius: 0;
   }
 
   /* Клавиатурный фокус (Tab): кольцо на триггере, не при клике мышью */
@@ -86,17 +121,21 @@ custom-select {
     /* Масштаб стрелки для press-эффекта (вдавливание при нажатии) */
     --cs-arrow-scale: 1;
     min-width: var(--cs-min-width);
-    height: 100%;
+    height: var(--cs-trigger-height);
+    min-height: var(--cs-trigger-height);
     box-sizing: border-box;
-    display: inline-block;
+    display: flex;
+    align-items: center;
+    width: 100%;
+    line-height: 1.5;
     cursor: pointer;
     background: var(--cs-bg);
     border-radius: var(--cs-border-radius, 10px);
     border: 1px solid var(--cs-border);
-    padding: 0.3125rem 1.875rem 0rem 0.625rem;
+    padding: var(--cs-trigger-pad-y) 1.875rem var(--cs-trigger-pad-y) 0.625rem;
     position: relative;
     white-space: nowrap;
-    overflow: visible;
+    overflow: hidden;
     text-overflow: ellipsis;
 
     &:after {
@@ -125,10 +164,12 @@ custom-select {
 
     p {
       margin: 0;
-      display: inline-block;
+      flex: 1 1 auto;
+      min-width: 0;
       overflow: hidden;
       max-width: 100%;
       text-overflow: ellipsis;
+      white-space: nowrap;
     }
     b {
       font-weight: normal;

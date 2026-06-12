@@ -323,40 +323,46 @@ const CustomSelect = class extends HTMLElement {
     }
     this.dataset.theme = this.#theme
 
-    this.#parseOptions() // parse <options> to items
-    this.#render('init')
+    queueMicrotask(() => {
+      if (!this.isConnected) return
 
-    // Initialize ARIA attributes
-    this.#updateAriaAttributes()
+      this.#parseOptions() // parse <options> to items
+      this.#render('init')
 
-    // Set up option watcher
-    this.#optionWatcher = setupOptionWatcher(
-      this,
-      () => {
-        this.#parseOptions()
-        // Close popup if open - unlock scroll before closing
-        if (this.$popup?.open) {
-          unlockScroll()
-          this.$popup.close()
-        }
-        this.#render('items')
-      },
-      () => this.#isRendering
-    )
+      // Initialize ARIA attributes
+      this.#updateAriaAttributes()
 
-    if (this.#optionWatcher) {
-      this.#optionWatcher.observe(this, {
-        childList: true,
-        subtree: true,
-        attributes: true,
-        characterData: true,
-        attributeFilter: ['value', 'selected', 'disabled', 'label'],
-      })
-    }
+      // Set up option watcher
+      this.#optionWatcher = setupOptionWatcher(
+        this,
+        () => {
+          this.#parseOptions()
+          // Close popup if open - unlock scroll before closing
+          if (this.$popup?.open) {
+            unlockScroll()
+            this.$popup.close()
+          }
+          this.#render('items')
+        },
+        () => this.#isRendering
+      )
 
-    // Initialize disabled state
-    this.disabled = this.hasAttribute('disabled')
-    this.#updateDisabledState() // Ensure tabIndex is set correctly
+      if (this.#optionWatcher) {
+        this.#optionWatcher.observe(this, {
+          childList: true,
+          subtree: true,
+          attributes: true,
+          characterData: true,
+          attributeFilter: ['value', 'selected', 'disabled', 'label'],
+        })
+      }
+
+      // Initialize disabled state
+      this.disabled = this.hasAttribute('disabled')
+      this.#updateDisabledState() // Ensure tabIndex is set correctly
+
+      this.#initializing = false
+    })
 
     // Associate with form labels
     this.labelClickListener = setupLabelAssociation(this, this.id || this.name, async () => {
@@ -387,8 +393,6 @@ const CustomSelect = class extends HTMLElement {
         }
       }
     })
-
-    this.#initializing = false
   }
 
   disconnectedCallback() {

@@ -865,6 +865,13 @@ const CustomSelect = class extends HTMLElement {
 
     this.#container.innerHTML = this.#selectHtml()
 
+    // Replacing innerHTML removes the source <option>/<optgroup> children (they
+    // have already been parsed into items). The option watcher would otherwise
+    // see those removals as an external change and re-parse, finding zero
+    // options and wiping items — breaking the mobile sheet and value display.
+    // Discard the render-induced mutation records so the watcher ignores them.
+    this.#optionWatcher?.takeRecords?.()
+
     // Popup is created lazily, don't query for it
     this.$value = this.#container.querySelector('label')
     this.$select = this.#container.querySelector('select')

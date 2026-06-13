@@ -34,20 +34,27 @@ describe('desktop popup lifecycle', () => {
     el.remove()
   })
 
-  it('removes the dialog on full re-render', async () => {
+  it('preserves open popup and updates items on full re-render', async () => {
     const el = mountSelect()
     await Bun.sleep(20)
 
     await openPopup(el)
     expect(el.querySelectorAll(':scope > dialog.cs-popup').length).toBe(1)
+    expect([...el.$popup.querySelectorAll('li')].map(li => li.dataset.value)).toEqual(['a', 'b'])
 
     el.items = [
       { value: 'x', label: 'X-ray' },
       { value: 'y', label: 'Yankee' },
     ]
-    await Bun.sleep(20)
+    for (let i = 0; i < 50; i++) {
+      await Bun.sleep(20)
+      const values = [...el.$popup.querySelectorAll('li')].map(li => li.dataset.value)
+      if (values.includes('x') && values.includes('y')) break
+    }
 
-    expect(el.querySelectorAll(':scope > dialog.cs-popup').length).toBe(0)
+    expect(el.querySelectorAll(':scope > dialog.cs-popup').length).toBe(1)
+    expect(el.$popup.open).toBe(true)
+    expect([...el.$popup.querySelectorAll('li')].map(li => li.dataset.value)).toEqual(['x', 'y'])
     el.remove()
   })
 })

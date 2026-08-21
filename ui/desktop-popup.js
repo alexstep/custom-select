@@ -178,7 +178,7 @@ export function setupFilter($dialog, options = {}) {
   let filterCleanup = () => {}
   let isCleanedUp = false
 
-  void import('../filter/filter-module.js')
+  import('../filter/filter-module.js')
     .then(({ setupFilter: setupFilterModule }) => {
       if (isCleanedUp) return
       const $items = Array.from($dialog.querySelectorAll('li'))

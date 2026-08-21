@@ -28,10 +28,7 @@ export interface CustomSelectSearchContext {
  *   items that were never present as `<option>` children are rendered and, once
  *   chosen, registered on the component.
  */
-export type CustomSelectSearchHandler = (
-  query: string,
-  context: CustomSelectSearchContext
-) => Promise<CustomSelectItem[]>
+export type CustomSelectSearchHandler = (query: string, context: CustomSelectSearchContext) => Promise<CustomSelectItem[]>
 
 export interface CustomSelectChangeEventDetail {
   value: string | string[]
@@ -79,31 +76,11 @@ declare class CustomSelect extends HTMLElement {
 
   _groupedItems(): CustomSelectGroupedItems
 
-  addEventListener(
-    type: 'change',
-    listener: (this: CustomSelect, ev: CustomEvent<CustomSelectChangeEventDetail>) => void,
-    options?: boolean | AddEventListenerOptions
-  ): void
-  addEventListener(
-    type: 'popup-open',
-    listener: (this: CustomSelect, ev: CustomEvent<Record<string, never>>) => void,
-    options?: boolean | AddEventListenerOptions
-  ): void
-  addEventListener(
-    type: 'popup-close',
-    listener: (this: CustomSelect, ev: CustomEvent<Record<string, never>>) => void,
-    options?: boolean | AddEventListenerOptions
-  ): void
-  addEventListener(
-    type: 'filter-change',
-    listener: (this: CustomSelect, ev: CustomEvent<CustomSelectFilterChangeEventDetail>) => void,
-    options?: boolean | AddEventListenerOptions
-  ): void
-  addEventListener(
-    type: string,
-    listener: EventListenerOrEventListenerObject,
-    options?: boolean | AddEventListenerOptions
-  ): void
+  addEventListener(type: 'change', listener: (this: CustomSelect, ev: CustomEvent<CustomSelectChangeEventDetail>) => void, options?: boolean | AddEventListenerOptions): void
+  addEventListener(type: 'popup-open', listener: (this: CustomSelect, ev: CustomEvent<Record<string, never>>) => void, options?: boolean | AddEventListenerOptions): void
+  addEventListener(type: 'popup-close', listener: (this: CustomSelect, ev: CustomEvent<Record<string, never>>) => void, options?: boolean | AddEventListenerOptions): void
+  addEventListener(type: 'filter-change', listener: (this: CustomSelect, ev: CustomEvent<CustomSelectFilterChangeEventDetail>) => void, options?: boolean | AddEventListenerOptions): void
+  addEventListener(type: string, listener: EventListenerOrEventListenerObject, options?: boolean | AddEventListenerOptions): void
 }
 
 export default CustomSelect

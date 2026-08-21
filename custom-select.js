@@ -73,6 +73,8 @@ const CustomSelect = class extends HTMLElement {
   #clearPopupListeners = () => {}
   #optionWatcher = null
   #typeaheadCleanup = null
+  // На инстансе — чтобы destroy мог отменить отложенное закрытие
+  #closeFallback = null
 
   // Lazy loaded modules cache
   #desktopPopupModule = null
@@ -1144,9 +1146,7 @@ const CustomSelect = class extends HTMLElement {
   }
 
   #removeOrphanPopups(keep = null) {
-    const candidates = this.shadowRoot
-      ? [...document.querySelectorAll('dialog.cs-popup')].filter(dialog => dialog.__csSelect === this)
-      : [...this.querySelectorAll(':scope > dialog.cs-popup')]
+    const candidates = this.shadowRoot ? [...document.querySelectorAll('dialog.cs-popup')].filter(dialog => dialog.__csSelect === this) : [...this.querySelectorAll(':scope > dialog.cs-popup')]
 
     for (const dialog of candidates) {
       if (dialog === keep) continue
@@ -1159,6 +1159,10 @@ const CustomSelect = class extends HTMLElement {
   }
 
   #destroyPopup() {
+    // До обнуления $popup — иначе после ухода со страницы всё равно сработает unlockScroll
+    clearTimeout(this.#closeFallback)
+    this.#closeFallback = null
+
     const popup = this.$popup
     this.$popup = null
     this.#popupId = null
@@ -1479,8 +1483,10 @@ const CustomSelect = class extends HTMLElement {
     this.$popup.dataset.hide = 'true'
 
     const finishClose = () => {
-      this.$popup.removeEventListener('transitionend', onTransitionEnd)
-      clearTimeout(closeFallback)
+      // popup уже снят при уходе со страницы
+      this.$popup?.removeEventListener('transitionend', onTransitionEnd)
+      clearTimeout(this.#closeFallback)
+      this.#closeFallback = null
       unlockScroll()
       if (this.$popup?.open) this.$popup.close()
     }
@@ -1491,7 +1497,7 @@ const CustomSelect = class extends HTMLElement {
     }
 
     this.$popup.addEventListener('transitionend', onTransitionEnd)
-    const closeFallback = setTimeout(finishClose, 400)
+    this.#closeFallback = setTimeout(finishClose, 400)
   }
 }
 

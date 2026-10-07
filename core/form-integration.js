@@ -37,9 +37,10 @@ export function setFormValue(internals, value, name) {
       }
       const fd = new FormData()
       for (const v of [...new Set(value)]) {
-        if (v !== '' && v != null) fd.append(name, v)
+        if (v !== '' && v != null) fd.append(name, String(v))
       }
-      internals.setFormValue(fd)
+      // Nothing selected: omit the control, same as a native <select multiple>.
+      internals.setFormValue([...fd.keys()].length ? fd : null)
     } else {
       internals.setFormValue(value)
     }
@@ -96,6 +97,40 @@ export function updateAriaAttributes(element, options = {}) {
 
   if (disabled !== undefined) {
     element.setAttribute('aria-disabled', disabled.toString())
+  }
+
+  if (options.required !== undefined) {
+    if (options.required) element.setAttribute('aria-required', 'true')
+    else element.removeAttribute('aria-required')
+  }
+
+  if (options.autocomplete !== undefined) {
+    element.setAttribute('aria-autocomplete', options.autocomplete)
+  }
+}
+
+/**
+ * Reflect constraint validation for a required empty selection.
+ * Disabled controls are barred from validation, matching a native select.
+ * @param {*} internals
+ * @param {{ required?: boolean, empty?: boolean, disabled?: boolean, anchor?: HTMLElement | null }} state
+ */
+export function updateFormValidity(internals, state = {}) {
+  if (!internals || typeof internals.setValidity !== 'function') return
+
+  const valueMissing = !!state.required && !state.disabled && !!state.empty
+  const flags = valueMissing ? { valueMissing: true } : {}
+  const message = valueMissing ? 'Please select an item in the list.' : ''
+
+  try {
+    if (valueMissing && state.anchor) internals.setValidity(flags, message, state.anchor)
+    else internals.setValidity(flags, message)
+  } catch {
+    try {
+      internals.setValidity(flags, message)
+    } catch {
+      // ElementInternals is missing or incomplete (non-browser test DOM).
+    }
   }
 }
 

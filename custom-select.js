@@ -11,7 +11,7 @@
 // === СТАТИЧЕСКИЕ ИМПОРТЫ (нужны при инициализации) ===
 import { SelectCore } from './core/select-core.js'
 import { parseOptions, setupOptionWatcher } from './core/options-parser.js'
-import { initializeFormInternals, setFormValue, setupLabelAssociation, updateAriaAttributes } from './core/form-integration.js'
+import { initializeFormInternals, setFormValue, setupLabelAssociation, updateAriaAttributes, updateFormValidity } from './core/form-integration.js'
 import { getValueHtml, updateValueDisplay, generateNativeSelectHtml } from './ui/value-display.js'
 import { isMobile, isIOS } from './utils/platform.js'
 import { debounce, lockScroll, unlockScroll } from './utils/dom.js'
@@ -36,6 +36,7 @@ const CustomSelect = class extends HTMLElement {
     'search-mode',
     'onsearch',
     'disabled',
+    'required',
     'shadow-dom',
     'no-sheet-history',
   ]
@@ -58,6 +59,14 @@ const CustomSelect = class extends HTMLElement {
   #noSheetHistory = false
   #previousFocus = null
   #initializing = true
+  #formDisabled = false
+  #defaultValue = null
+  #defaultCaptured = false
+  #showPromise = null
+  #openFocusMode = 'selected'
+  #pendingIndex = 0
+  #keyboardSyncIndex = null
+  #hostKeydown = null
 
   // DOM references
   $popup = null
@@ -104,8 +113,11 @@ const CustomSelect = class extends HTMLElement {
     return this.#name
   }
   set name(v) {
-    this.#name = v
-    this.#core.setName(v)
+    const next = v == null ? '' : String(v)
+    this.#name = next
+    this.#core.setName(next)
+    if ((this.getAttribute('name') ?? '') !== next) this.setAttribute('name', next)
+    this.#syncForm()
     this.#render('name')
   }
 
@@ -113,11 +125,34 @@ const CustomSelect = class extends HTMLElement {
     return this.#core.getValue()
   }
   set value(v) {
-    if (this.#core.setValue(v)) {
-      setFormValue(this.#internals, this.#core.getValue(), this.#name)
-      this.#updateValueDisplay()
-      if (!this.#initializing) this.#emitChange()
-    }
+    // Programmatic assignment matches <select>: update the form value, do not fire input/change.
+    this.#assignValue(v, { emit: false })
+  }
+
+  get required() {
+    return this.hasAttribute('required')
+  }
+  set required(v) {
+    if (v) this.setAttribute('required', '')
+    else this.removeAttribute('required')
+  }
+
+  // Chrome exposes constraint validation on the form, but not yet as IDL on the
+  // custom element. Delegate so callers can use the same surface as <select>.
+  get validity() {
+    return this.#internals?.validity
+  }
+  get validationMessage() {
+    return this.#internals?.validationMessage ?? ''
+  }
+  get willValidate() {
+    return !!this.#internals?.willValidate
+  }
+  checkValidity() {
+    return this.#internals?.checkValidity?.() ?? true
+  }
+  reportValidity() {
+    return this.#internals?.reportValidity?.() ?? true
   }
 
   get multiple() {
@@ -233,6 +268,7 @@ const CustomSelect = class extends HTMLElement {
       this.#disabled = disabled
       if (disabled) {
         this.setAttribute('disabled', '')
+        this.#hidePopup({ immediate: true })
       } else {
         this.removeAttribute('disabled')
       }
@@ -266,9 +302,10 @@ const CustomSelect = class extends HTMLElement {
     } else if (name === 'multiple') {
       this.multiple = !['false', '0'].includes(newValue)
       if (this.multiple && !Array.isArray(this.value)) {
-        this.value = [this.value]
+        const current = this.value
+        this.value = current == null || current === '' ? [] : [current]
       } else if (!this.multiple && Array.isArray(this.value)) {
-        this.value = this.value[0]
+        this.value = this.value[0] ?? ''
       }
     } else if (name === 'value') {
       // Only update if value actually changed
@@ -288,6 +325,9 @@ const CustomSelect = class extends HTMLElement {
       // The attribute is just for observation
     } else if (name === 'disabled') {
       this.disabled = this.hasAttribute('disabled')
+    } else if (name === 'required') {
+      this.#updateValidity()
+      this.#updateAriaAttributes()
     } else if (name === 'shadow-dom') {
       this.useShadowDom = this.hasAttribute('shadow-dom')
     } else {
@@ -296,10 +336,20 @@ const CustomSelect = class extends HTMLElement {
     }
   }
 
+  formResetCallback() {
+    const stored = this.#defaultValue
+    const next = Array.isArray(stored) ? [...stored] : stored == null ? (this.multiple ? [] : '') : stored
+    this.#assignValue(next, { emit: false, force: true })
+  }
+
+  formDisabledCallback(disabled) {
+    this.#formDisabled = !!disabled
+    if (this.#isDisabled()) this.#hidePopup({ immediate: true })
+    this.#updateDisabledState()
+  }
+
   connectedCallback() {
     this.removeAttribute('data-cs-ready')
-
-    if (this.multiple) this.value = []
 
     // Initialize shadow root if enabled (must happen before any DOM manipulation)
     if (this.#useShadowDom && !this.shadowRoot) {
@@ -313,7 +363,7 @@ const CustomSelect = class extends HTMLElement {
       if (isIOS()) this.dataset.ios = true
       // Always add click listener on mobile to handle dynamic behavior
       this.addEventListener('click', () => {
-        if (this.#disabled) return
+        if (this.#isDisabled()) return
         // Android + multiple: use mobile sheet (native select multiple doesn't open picker on Android)
         const isAndroidMultiple = isMobile() && !isIOS() && this.multiple
         const shouldUseMobileSheet = isMobile() && (this.mobileview === 'sheet' || this.searchable || isAndroidMultiple)
@@ -329,6 +379,9 @@ const CustomSelect = class extends HTMLElement {
       if (!this.isConnected) return
 
       this.#parseOptions() // parse <options> to items
+      this.#syncForm()
+      this.#updateValidity()
+      this.#captureDefault()
       this.#render('init')
 
       // Initialize ARIA attributes
@@ -368,7 +421,7 @@ const CustomSelect = class extends HTMLElement {
 
     // Associate with form labels
     this.labelClickListener = setupLabelAssociation(this, this.id || this.name, async () => {
-      if (this.#disabled) return
+      if (this.#isDisabled()) return
       const isAndroidMultiple = isMobile() && !isIOS() && this.multiple
       const isMobileSheet = isMobile() && this.mobileview !== 'desktop' && (this.mobileview === 'sheet' || this.searchable || isAndroidMultiple)
       if (isMobileSheet) {
@@ -381,20 +434,20 @@ const CustomSelect = class extends HTMLElement {
     // Setup typeahead for when component is focused but popup is closed
     this.#setupComponentTypeahead()
 
-    // Handle Enter/Space to open popup
-    this.addEventListener('keydown', e => {
-      if (this.#disabled || this.$popup?.open) return
-      if (e.key === 'Enter' || e.key === ' ') {
-        e.preventDefault()
-        const isAndroidMultiple = isMobile() && !isIOS() && this.multiple
-        const isMobileSheet = isMobile() && (this.mobileview === 'sheet' || this.searchable || isAndroidMultiple)
-        if (isMobileSheet) {
-          this.#showMobileSheet()
-        } else {
-          this.#showPopup()
-        }
-      }
-    })
+    // Collapsed combobox: open the listbox (APG select-only). Arrows/Home/End also move inside it.
+    this.#hostKeydown = e => {
+      if (this.#isDisabled() || this.$popup?.open) return
+      if (e.ctrlKey || e.metaKey) return
+      if (e.target !== this && !this.contains(/** @type {Node} */ (e.target))) return
+      if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp' && e.key !== 'Home' && e.key !== 'End' && e.key !== 'Enter' && e.key !== ' ') return
+      e.preventDefault()
+      const mode = e.key === 'Home' ? 'first' : e.key === 'End' ? 'last' : e.key === 'ArrowUp' ? 'prev' : e.key === 'ArrowDown' ? 'next' : 'selected'
+      const isAndroidMultiple = isMobile() && !isIOS() && this.multiple
+      const isMobileSheet = isMobile() && (this.mobileview === 'sheet' || this.searchable || isAndroidMultiple)
+      if (isMobileSheet) this.#showMobileSheet()
+      else this.#showPopup(mode)
+    }
+    this.addEventListener('keydown', this.#hostKeydown)
   }
 
   disconnectedCallback() {
@@ -404,6 +457,7 @@ const CustomSelect = class extends HTMLElement {
     this.#optionWatcher?.cancel?.()
     this.#optionWatcher?.disconnect()
     this.#typeaheadCleanup?.()
+    if (this.#hostKeydown) this.removeEventListener('keydown', this.#hostKeydown)
 
     // Cleanup popup (light DOM or document.body in shadow mode)
     this.#destroyPopup()
@@ -416,6 +470,134 @@ const CustomSelect = class extends HTMLElement {
   // DOM container abstraction - returns shadow root or element itself
   get #container() {
     return this.shadowRoot || this
+  }
+
+  #isDisabled() {
+    return this.#disabled || this.#formDisabled
+  }
+
+  #isEmptyValue() {
+    const value = this.#core.getValue()
+    if (this.multiple) return !Array.isArray(value) || value.length === 0
+    return value == null || value === ''
+  }
+
+  /**
+   * @param {*} value
+   * @param {{ emit?: boolean, force?: boolean }} [options]
+   */
+  #orderedValues(value) {
+    const list = Array.isArray(value) ? value : value == null || value === '' ? [] : [value]
+    const order = this.#core.getItems().map(item => String(item.value))
+    const unique = [...new Set(list.filter(item => item != null && item !== '').map(item => String(item)))]
+    unique.sort((a, b) => {
+      const ia = order.indexOf(a)
+      const ib = order.indexOf(b)
+      if (ia === -1 && ib === -1) return 0
+      if (ia === -1) return 1
+      if (ib === -1) return -1
+      return ia - ib
+    })
+    return unique
+  }
+
+  #assignValue(value, options = {}) {
+    const next = this.multiple ? this.#orderedValues(value) : value
+    const changed = this.#core.setValue(next)
+    if (!changed && !options.force) return false
+    this.#syncForm()
+    this.#updateValidity()
+    this.#updateValueDisplay()
+    if (options.emit && changed && !this.#initializing) this.#emitInputAndChange()
+    return changed
+  }
+
+  #syncForm() {
+    const name = this.getAttribute('name') || this.#name || ''
+    let value = this.#core.getValue()
+    if (this.multiple) {
+      if (!Array.isArray(value)) value = value == null || value === '' ? [] : [String(value)]
+    } else if (value == null) {
+      value = ''
+    }
+    setFormValue(this.#internals, value, name)
+  }
+
+  #updateValidity() {
+    const anchor = this.$value?.isConnected ? this.$value : null
+    if (anchor && anchor.tabIndex < 0) anchor.tabIndex = -1
+    updateFormValidity(this.#internals, {
+      required: this.hasAttribute('required'),
+      empty: this.#isEmptyValue(),
+      disabled: this.#isDisabled(),
+      anchor,
+    })
+    const invalid = this.hasAttribute('required') && this.#isEmptyValue() && !this.#isDisabled()
+    if (invalid) this.setAttribute('aria-invalid', 'true')
+    else this.removeAttribute('aria-invalid')
+  }
+
+  #emitInputAndChange() {
+    const detail = { value: this.#core.getValue() }
+    this.dispatchEvent(new CustomEvent('input', { detail, bubbles: true, composed: true }))
+    this.dispatchEvent(new CustomEvent('change', { detail, bubbles: true, composed: true }))
+  }
+
+  #captureDefault() {
+    if (this.#defaultCaptured) return
+    this.#defaultCaptured = true
+    const value = this.#core.getValue()
+    this.#defaultValue = Array.isArray(value) ? [...value] : value
+  }
+
+  #mountChrome() {
+    const container = this.#container
+    for (const child of [...container.children]) {
+      if (child.tagName === 'OPTION' || child.tagName === 'OPTGROUP') continue
+      if (child.classList?.contains('cs-popup')) continue
+      child.remove()
+    }
+    const tpl = document.createElement('template')
+    tpl.innerHTML = this.#selectHtml().trim()
+    const label = tpl.content.firstElementChild
+    if (label) container.prepend(label)
+  }
+
+  #indexForMode(mode) {
+    const items = [...(this.$popup?.querySelectorAll('li') ?? [])]
+    const enabled = index => items[index] && !items[index].hasAttribute('disabled')
+    const first = items.findIndex((_, index) => enabled(index))
+    let last = first
+    for (let i = items.length - 1; i >= 0; i--) {
+      if (enabled(i)) {
+        last = i
+        break
+      }
+    }
+    const selected = items.findIndex(el => el.hasAttribute('selected') && !el.hasAttribute('disabled'))
+    if (mode === 'first') return first
+    if (mode === 'last') return last
+    if (mode === 'next') {
+      const start = selected >= 0 ? selected + 1 : 0
+      for (let i = start; i < items.length; i++) if (enabled(i)) return i
+      return first
+    }
+    if (mode === 'prev') {
+      const start = selected >= 0 ? selected - 1 : items.length - 1
+      for (let i = start; i >= 0; i--) if (enabled(i)) return i
+      return last
+    }
+    return selected >= 0 ? selected : first
+  }
+
+  #applyListFocus(index) {
+    const items = [...(this.$popup?.querySelectorAll('li') ?? [])]
+    const option = items[index]
+    if (!option) return
+    this.#keyboardSyncIndex?.(index)
+    this.#activeDescendantId = option.id || null
+    if (!this.#searchable) option.focus()
+    this.#updateAriaAttributes()
   }
 
   // Setup CSS styles for shadow DOM
@@ -796,18 +978,20 @@ const CustomSelect = class extends HTMLElement {
   }
 
   #parseOptions() {
+    // After the user has a selection, rebuilding items must not snap back to the
+    // original `selected` attributes (native <select> keeps the current value).
+    const preserve = !this.#initializing && !this.#isEmptyValue()
     const result = parseOptions(this, value => {
-      this.value = value
+      if (!preserve) this.value = value
     })
 
     this.#core.setItems(result.items)
 
-    // Set multiple selected values
-    if (this.multiple && result.selectedValues.length > 0) {
+    if (this.multiple && result.selectedValues.length > 0 && !preserve) {
       this.value = result.selectedValues
     }
 
-    // Set default value - first item
+    // Set default value - first item, same as a native select without a placeholder.
     if (!this.multiple && !this.#core.getValue() && !this.placeholder) {
       this.value = result.items[0]?.value || ''
     }
@@ -865,7 +1049,7 @@ const CustomSelect = class extends HTMLElement {
     this.#clearPopupListeners()
     this.#destroyPopup()
 
-    this.#container.innerHTML = this.#selectHtml()
+    this.#mountChrome()
 
     // Replacing innerHTML removes the source <option>/<optgroup> children (they
     // have already been parsed into items). The option watcher would otherwise
@@ -881,10 +1065,10 @@ const CustomSelect = class extends HTMLElement {
     // Add click handler to label for desktop mode
     if (!this.dataset.mobile && this.$value) {
       this.$value.addEventListener('click', () => {
-        if (!this.#disabled) {
-          this.focus()
-          this.#showPopup()
-        }
+        if (this.#isDisabled()) return
+        this.focus()
+        if (this.$popup?.open) this.#hidePopup()
+        else this.#showPopup('selected')
       })
     }
 
@@ -895,12 +1079,13 @@ const CustomSelect = class extends HTMLElement {
         const multiBox = this.mobileview === 'native-multiple'
         const values = this.multiple || multiBox ? Array.from(e.target.querySelectorAll('option:checked')).map(el => el.value) : [e.target.value]
         const newValue = this.multiple ? values : (multiBox ? values.filter(v => v !== this.value) : values).pop()
-        this.value = newValue
+        this.#assignValue(newValue, { emit: true })
       })
     }
 
     this.#isRendering = false
     this.#updateValueDisplay()
+    this.#updateValidity()
     this.setAttribute('data-cs-ready', '')
   }
 
@@ -914,8 +1099,8 @@ const CustomSelect = class extends HTMLElement {
     const isMobileSheet = isMobile() && this.mobileview !== 'desktop' && (this.mobileview === 'sheet' || this.searchable || isAndroidMultiple)
 
     const valueLabelHtml = () => {
-      return `<label>
-          <p>${getValueHtml(this.value, this.items, this.placeholder)}</p>
+      return `<label part="trigger">
+          <p part="value">${getValueHtml(this.value, this.items, this.placeholder)}</p>
           ${!isMobileSheet ? generateNativeSelectHtml(items, groups, this.name, this.multiple || this.mobileview === 'native-multiple', this.#disabled) : ''}
         </label>`
     }
@@ -956,60 +1141,39 @@ const CustomSelect = class extends HTMLElement {
     this.#isRendering = false
   }
 
-  #emitChange() {
-    this.dispatchEvent(
-      new CustomEvent('change', {
-        detail: { value: this.#core.getValue() },
-        bubbles: false,
-      })
-    )
-  }
-
   #updateAriaAttributes(forceExpanded) {
-    const isExpanded = forceExpanded !== undefined ? forceExpanded : this.$popup?.open || false
-    // Update ARIA attributes on the trigger element (label)
+    const listbox = this.$popup?.querySelector('[role="listbox"]')
+    const isExpanded = forceExpanded !== undefined ? forceExpanded : !!this.$popup?.open
+    // Combobox semantics live on the focusable host. The inner label is presentational.
+    this.removeAttribute('aria-multiselectable')
     if (this.$value) {
-      updateAriaAttributes(this.$value, {
-        role: 'combobox',
-        haspopup: 'listbox',
-        expanded: isExpanded,
-        activedescendant: this.#activeDescendantId,
-        controls: this.#popupId,
-        multiselectable: this.multiple,
-        disabled: this.#disabled,
-      })
+      for (const name of ['role', 'aria-haspopup', 'aria-expanded', 'aria-activedescendant', 'aria-controls', 'aria-multiselectable', 'aria-disabled', 'aria-autocomplete']) {
+        this.$value.removeAttribute(name)
+      }
     }
-
-    // Also update on the custom element itself for backwards compatibility
     updateAriaAttributes(this, {
       role: 'combobox',
       haspopup: 'listbox',
       expanded: isExpanded,
-      activedescendant: this.#activeDescendantId,
-      controls: this.#popupId,
-      multiselectable: this.multiple,
-      disabled: this.#disabled,
+      activedescendant: isExpanded ? this.#activeDescendantId : null,
+      controls: listbox?.id || null,
+      disabled: this.#isDisabled(),
+      required: this.hasAttribute('required'),
+      autocomplete: this.#searchable ? 'list' : 'none',
     })
   }
 
   #updateDisabledState() {
-    // Update tabindex for focus management
-    this.tabIndex = this.#disabled ? -1 : 0
+    const disabled = this.#isDisabled()
+    this.tabIndex = disabled ? -1 : 0
 
-    // Update native select disabled state
     if (this.$select) {
-      this.$select.disabled = this.#disabled
+      this.$select.disabled = disabled
     }
 
-    // Update visual styling
-    if (this.#disabled) {
-      this.classList.add('cs-disabled')
-    } else {
-      this.classList.remove('cs-disabled')
-    }
-
-    // Update ARIA attributes
+    this.classList.toggle('cs-disabled', disabled)
     this.#updateAriaAttributes()
+    this.#updateValidity()
   }
 
   #setupComponentTypeahead() {
@@ -1018,7 +1182,7 @@ const CustomSelect = class extends HTMLElement {
 
     const typeaheadHandler = e => {
       // Only work when component is focused, popup is closed, and not disabled
-      if (document.activeElement !== this || this.$popup?.open || this.#disabled) {
+      if (document.activeElement !== this || this.$popup?.open || this.#isDisabled()) {
         return
       }
 
@@ -1080,7 +1244,7 @@ const CustomSelect = class extends HTMLElement {
         // Use requestAnimationFrame to ensure DOM is ready
         requestAnimationFrame(() => {
           $targetItem.focus()
-          // Update aria-activedescendant
+          this.#keyboardSyncIndex?.(index)
           this.#activeDescendantId = $targetItem.id
           this.#updateAriaAttributes()
         })
@@ -1122,13 +1286,14 @@ const CustomSelect = class extends HTMLElement {
     const popup = document.createElement('dialog')
     popup.className = 'cs-popup'
     popup.__csSelect = this
+    popup.setAttribute('part', 'popup')
 
-    const { items, groups } = this._groupedItems()
-    popup.innerHTML = createPopupHTML(items, groups)
-
-    this.#popupId = `cs-popup-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+    this.#popupId = `cs-${Math.random().toString(36).slice(2, 10)}`
     popup.id = this.#popupId
     popup.dataset.theme = this.#theme
+
+    const { items, groups } = this._groupedItems()
+    popup.innerHTML = createPopupHTML(items, groups, { idPrefix: `${this.#popupId}-`, multiple: this.multiple })
 
     this.$popup = popup
     this.#appendPopupToDom(popup)
@@ -1187,21 +1352,21 @@ const CustomSelect = class extends HTMLElement {
 
     const { createPopupHTML } = await this.#loadDesktopPopup()
     const { items, groups: processedGroups } = this._groupedItems()
-
-    const newItemsHtml = createPopupHTML(items, processedGroups)
-
-    // Replace the content of the ul inside the popup
-    const $ul = this.$popup.querySelector('ul')
-    if ($ul) {
-      $ul.innerHTML = newItemsHtml.replace('<ul>', '').replace('</ul>', '')
-    }
+    const html = createPopupHTML(items, processedGroups, { idPrefix: `${this.#popupId}-`, multiple: this.multiple })
+    const tpl = document.createElement('template')
+    tpl.innerHTML = html
+    const next = tpl.content.querySelector('ul')
+    const current = this.$popup.querySelector('[role="listbox"]')
+    if (next && current) current.replaceWith(next)
+    else if (next) this.$popup.append(next)
+    if (this.$popup.open) this.#setupPopupListeners()
   }
 
   /**
    * Показать мобильный sheet (lazy load модуля)
    */
   #showMobileSheet() {
-    if (this.#disabled) return
+    if (this.#isDisabled()) return
 
     const { items, groups } = this._groupedItems()
     this.#createMobileSheetAsync(items, groups)
@@ -1232,10 +1397,10 @@ const CustomSelect = class extends HTMLElement {
           } else {
             currentValue = [...new Set([...currentValue, value])]
           }
-          this.value = currentValue
+          this.#assignValue(currentValue, { emit: true })
           // Don't close for multiple - user continues selecting
         } else {
-          this.value = value
+          this.#assignValue(value, { emit: true })
           gestures.destroy()
           this.focus()
         }
@@ -1254,9 +1419,21 @@ const CustomSelect = class extends HTMLElement {
    * Показать desktop popup (lazy load модулей)
    * Загружает desktop-popup и dom-utils при первом открытии
    */
-  async #showPopup() {
-    if (this.#disabled) return
+  async #showPopup(mode = 'selected') {
+    if (this.#isDisabled()) return
+    if (this.$popup?.open) return
+    if (this.#showPromise) return this.#showPromise
 
+    this.#openFocusMode = mode
+    this.#showPromise = this.#openPopup()
+    try {
+      await this.#showPromise
+    } finally {
+      this.#showPromise = null
+    }
+  }
+
+  async #openPopup() {
     // Lazy load popup and ensure it exists
     await this.#ensurePopup()
     if (this.$popup?.open) {
@@ -1299,13 +1476,9 @@ const CustomSelect = class extends HTMLElement {
           // Скролл блокируется автоматически через observer
           lockScroll()
 
+          this.#pendingIndex = this.#indexForMode(this.#openFocusMode)
           this.#setupPopupListeners()
-
-          // Focus first enabled item if not searchable (searchable focuses input)
-          if (!this.#searchable) {
-            const firstEnabled = this.$popup.querySelector('li:not([disabled])')
-            firstEnabled?.focus()
-          }
+          this.#applyListFocus(this.#pendingIndex)
 
           // Update ARIA attributes for expanded state
           this.#updateAriaAttributes()
@@ -1346,13 +1519,15 @@ const CustomSelect = class extends HTMLElement {
 
     // Setup keyboard navigation
     const keyboardUnsubscribe = setupKeyboard(this.$popup, {
+      initialIndex: this.#pendingIndex,
       onSelect: value => this.#handleItemSelect(value),
-      onClose: () => this.#hidePopup(),
+      onClose: reason => this.#hidePopup({ immediate: reason === 'tab' }),
       onNavigate: activeDescendantId => {
         this.#activeDescendantId = activeDescendantId
         this.#updateAriaAttributes()
       },
     })
+    this.#keyboardSyncIndex = keyboardUnsubscribe.syncIndex
 
     // Setup mouse interactions
     const mouseUnsubscribe = setupMouse(this.$popup, {
@@ -1381,6 +1556,14 @@ const CustomSelect = class extends HTMLElement {
     const blurAndResizeHandler = () => this.#hidePopup()
     window.addEventListener('blur', blurAndResizeHandler)
     window.addEventListener('resize', blurAndResizeHandler)
+
+    const onPointerDown = event => {
+      if (!this.$popup?.open) return
+      const path = typeof event.composedPath === 'function' ? event.composedPath() : [event.target]
+      if (path.includes(this) || path.includes(this.$popup)) return
+      this.#hidePopup()
+    }
+    document.addEventListener('pointerdown', onPointerDown, true)
 
     // Обработчик cancel (Escape) - dialog закрывается напрямую
     const cancelHandler = () => {
@@ -1414,8 +1597,10 @@ const CustomSelect = class extends HTMLElement {
       keyboardUnsubscribe()
       mouseUnsubscribe()
       filterUnsubscribe()
+      this.#keyboardSyncIndex = null
       window.removeEventListener('blur', blurAndResizeHandler)
       window.removeEventListener('resize', blurAndResizeHandler)
+      document.removeEventListener('pointerdown', onPointerDown, true)
       this.$popup?.removeEventListener('cancel', cancelHandler)
       this.$popup?.removeEventListener('close', closeHandler)
     }
@@ -1426,7 +1611,7 @@ const CustomSelect = class extends HTMLElement {
 
     if (this.multiple) {
       let currentValue = this.value
-      if (!Array.isArray(currentValue)) currentValue = [currentValue]
+      if (!Array.isArray(currentValue)) currentValue = currentValue == null || currentValue === '' ? [] : [currentValue]
 
       // IMPORTANT: Create a NEW array, don't mutate the existing one
       // Otherwise setValue() will see oldValue === newValue and skip the update
@@ -1436,15 +1621,15 @@ const CustomSelect = class extends HTMLElement {
         currentValue = currentValue.filter(v => v !== value) // filter already creates new array
       }
 
-      this.value = currentValue
+      this.#assignValue(currentValue, { emit: true })
     } else {
       this.#hidePopup()
-      this.value = selected ? value : ''
+      this.#assignValue(selected ? value : '', { emit: true })
     }
   }
 
   #isItemSelected(value) {
-    const result = this.multiple ? (this.value || []).includes(value) : this.value === value
+    const result = this.multiple ? (Array.isArray(this.value) ? this.value.includes(value) : false) : this.value === value
     return result
   }
 
@@ -1467,7 +1652,7 @@ const CustomSelect = class extends HTMLElement {
    * Скрыть popup
    * unlockScroll берется из кэша (модуль уже загружен при открытии)
    */
-  #hidePopup() {
+  #hidePopup({ immediate = false } = {}) {
     if (!this.$popup?.open) return
 
     // Dispatch popup-close event before hiding - allow cancellation
@@ -1480,6 +1665,13 @@ const CustomSelect = class extends HTMLElement {
     if (!this.dispatchEvent(closeEvent) || closeEvent.defaultPrevented) return
 
     this.dataset.popup = 'closed'
+    if (immediate) {
+      unlockScroll()
+      clearTimeout(this.#closeFallback)
+      this.#closeFallback = null
+      if (this.$popup?.open) this.$popup.close()
+      return
+    }
     this.$popup.dataset.hide = 'true'
 
     const finishClose = () => {

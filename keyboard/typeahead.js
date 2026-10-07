@@ -17,6 +17,10 @@ export function setupTypeahead(items, callbacks, timeout = 800) {
   let clearTimeoutId = null
 
   const typeaheadHandler = e => {
+    if (typeof callbacks.isActive === 'function' && !callbacks.isActive()) return
+    const tag = e.target?.tagName
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || e.target?.isContentEditable) return
+
     // Only handle printable characters (letters, numbers)
     // Allow Shift for uppercase letters
     if (e.key.length !== 1 || e.ctrlKey || e.metaKey || e.altKey) {

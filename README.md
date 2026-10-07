@@ -255,7 +255,8 @@ watch(() => props.modelValue, syncToElement)
 | `searchable` | boolean | `false` | Adds a filter input to the popup. |
 | `search-placeholder` | string | `''` | Filter input placeholder. |
 | `search-mode` | `local` \| `remote` | `local` | `remote` renders `onsearch` results wholesale (see [Async search](#frameworks-react-angular-vue)). |
-| `disabled` | boolean | `false` | Blocks interaction. |
+| `disabled` | boolean | `false` | Blocks interaction. Omitted from `FormData`. A parent `<fieldset disabled>` disables the control too. |
+| `required` | boolean | `false` | Empty value fails constraint validation (`valueMissing`), same as `<select required>`. |
 | `noscroll` | boolean | `false` | Disables popup internal scroll. |
 | `shadow-dom` | boolean | `false` | Render inside a Shadow DOM. |
 | `no-sheet-history` | boolean | `false` | Disables the mobile sheet's `history.pushState` back-button integration. |
@@ -276,7 +277,8 @@ Property-only:
 
 | Event | `detail` | When |
 | --- | --- | --- |
-| `change` | `{ value }` | Value changes. |
+| `input` | `{ value }` | User commits a new value (before `change`). Bubbles. Not fired by programmatic `.value =`. |
+| `change` | `{ value }` | User commits a new value. Bubbles. Not fired by programmatic `.value =`. |
 | `popup-open` | `{}` | Desktop popup opens. |
 | `popup-close` | `{}` | Desktop popup closes (cancelable). |
 | `filter-change` | `{ query, results }` | Filter input changes. |
@@ -306,6 +308,8 @@ custom-select {
   --cs-animation-duration: .25s;
 }
 ```
+
+With `shadow-dom`, style the trigger through parts: `custom-select::part(trigger)` and `custom-select::part(value)`. The listbox also exposes `listbox`, `option`, and `group`. In the default light-DOM mode, `::part` does not apply — use the variables above or normal selectors (`custom-select label`). The desktop popup is portaled to `document.body` when shadow DOM is on, so theme it with the same variables on `.cs-popup`.
 
 The desktop popup merges with the trigger into a single block and opens up or down depending on available space. The toggle arrow rotates on open and both the arrow and options have a press (scale) feedback. All transitions respect `prefers-reduced-motion`.
 

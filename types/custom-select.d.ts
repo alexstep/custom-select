@@ -63,6 +63,13 @@ declare class CustomSelect extends HTMLElement {
   readonly searchModes: readonly CustomSelectSearchMode[]
   onsearch: CustomSelectSearchHandler | null
   disabled: boolean
+  /** Mirrors the `required` attribute. Empty value fails constraint validation. */
+  required: boolean
+  readonly validity: ValidityState
+  readonly validationMessage: string
+  readonly willValidate: boolean
+  checkValidity(): boolean
+  reportValidity(): boolean
   useShadowDom: boolean
   /** Disable the bottom-sheet history.pushState/back hash side effect. */
   noSheetHistory: boolean
@@ -76,6 +83,10 @@ declare class CustomSelect extends HTMLElement {
 
   _groupedItems(): CustomSelectGroupedItems
 
+  formResetCallback(): void
+  formDisabledCallback(disabled: boolean): void
+
+  addEventListener(type: 'input', listener: (this: CustomSelect, ev: CustomEvent<CustomSelectChangeEventDetail>) => void, options?: boolean | AddEventListenerOptions): void
   addEventListener(type: 'change', listener: (this: CustomSelect, ev: CustomEvent<CustomSelectChangeEventDetail>) => void, options?: boolean | AddEventListenerOptions): void
   addEventListener(type: 'popup-open', listener: (this: CustomSelect, ev: CustomEvent<Record<string, never>>) => void, options?: boolean | AddEventListenerOptions): void
   addEventListener(type: 'popup-close', listener: (this: CustomSelect, ev: CustomEvent<Record<string, never>>) => void, options?: boolean | AddEventListenerOptions): void

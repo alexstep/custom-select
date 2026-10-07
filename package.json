@@ -21,7 +21,8 @@
     "./dist/custom-select.min.js": "./dist/custom-select.min.js",
     "./dist/custom-select.min.css": "./dist/custom-select.min.css",
     "./dist/*": "./dist/*",
-    "./styles/*.css": "./styles/*.css"
+    "./styles/*.css": "./styles/*.css",
+    "./custom-elements.json": "./custom-elements.json"
   },
   "engines": {
     "node": ">=18"
@@ -39,10 +40,12 @@
     "dist/*.min.css",
     "LICENSE",
     "README.md",
-    "types/"
+    "types/",
+    "custom-elements.json"
   ],
   "devDependencies": {
     "@happy-dom/global-registrator": "20.9.0",
+    "@playwright/test": "^1.63.0",
     "typescript": "^5.7.0"
   },
   "sideEffects": [
@@ -57,7 +60,8 @@
     "prepublishOnly": "npm run build",
     "types:check": "tsc -p tsconfig.declarations.json --noEmit",
     "types:emit-from-js": "tsc -p tsconfig.types.json",
-    "test": "bun test"
+    "test": "bun test",
+    "test:e2e": "playwright test"
   },
   "repository": {
     "type": "git",

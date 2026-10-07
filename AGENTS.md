@@ -93,6 +93,10 @@ CSS-переменные на элементе или предке: `--cs-bg`, `
 
 Манифест: `custom-elements.json`. Типы: `types/index.d.ts`, `types/custom-select.d.ts`.
 
+## Релиз
+
+Версию менять только когда это явно попросили. Публикация — workflow `.github/workflows/publish.yml` по тегу `vX.Y.Z` (или GitHub Release с таким тегом). Тег должен совпадать с `package.json`. Самим не вызывать `npm publish`, не ставить теги и не пушить в `main`. Trusted Publisher на npmjs.com: пакет `pure-custom-select`, файл workflow `publish.yml`, environment не задан.
+
 ## Карта исходников
 
 `custom-select.js` — элемент. `core/` — состояние, разбор опций, форма. `ui/` — попап и мобильный sheet. `keyboard/`, `filter/`, `utils/`, `styles/`. Демо — `demo.html` (исходники, не `dist/`).

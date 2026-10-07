@@ -83,8 +83,8 @@ export function setupFocusTrap(container) {
  * @returns {Function} Cleanup function
  */
 export function setupArrowKeyNavigation($items, options) {
-  const { onNavigate, onSelect, onClose } = options
-  let focusedItemIndex = findNextEnabledIndex($items, 0, 1)
+  const { onNavigate, onSelect, onClose, initialIndex } = options
+  let focusedItemIndex = Number.isInteger(initialIndex) ? initialIndex : findNextEnabledIndex($items, 0, 1)
 
   const scrollIntoViewIfNeeded = element => {
     if (element && typeof element.scrollIntoView === 'function') {
@@ -96,6 +96,15 @@ export function setupArrowKeyNavigation($items, options) {
   }
 
   const keyboardHandler = e => {
+    if (!$items.length) return
+    const target = e.target
+    const root = $items[0]?.parentElement?.closest('dialog') || $items[0]?.closest('dialog')
+    if (root && target instanceof Node && target !== root && !root.contains(target)) return
+
+    if (e.key === 'Tab') {
+      onClose?.('tab')
+      return
+    }
     if (e.key === 'ArrowDown') {
       e.preventDefault()
       focusedItemIndex = findNextEnabledIndex($items, focusedItemIndex + 1, 1)
@@ -128,8 +137,12 @@ export function setupArrowKeyNavigation($items, options) {
       scrollIntoViewIfNeeded(focusedElement)
       onNavigate?.(focusedItemIndex)
     }
-    if (e.key === 'Enter' || e.keyCode === 32) {
+    if (e.key === 'Enter' || e.key === ' ' || e.key === 'Spacebar') {
       e.preventDefault()
+      const active = document.activeElement
+      if (active && $items.includes(/** @type {HTMLElement} */ (active))) {
+        focusedItemIndex = $items.indexOf(/** @type {HTMLElement} */ (active))
+      }
       if (!$items[focusedItemIndex] || $items[focusedItemIndex].hasAttribute('disabled')) return
       onSelect?.($items[focusedItemIndex].dataset.value)
     }
@@ -141,7 +154,11 @@ export function setupArrowKeyNavigation($items, options) {
 
   document.addEventListener('keydown', keyboardHandler)
 
-  return () => {
+  const cleanup = () => {
     document.removeEventListener('keydown', keyboardHandler)
   }
+  cleanup.syncIndex = index => {
+    if (Number.isInteger(index)) focusedItemIndex = index
+  }
+  return cleanup
 }

@@ -10,16 +10,31 @@ import { debounce } from '../utils/dom.js'
 const INTERNAL_RENDER_SELECTOR = 'label, select, dialog, .cs-popup, .cs-mobile-dialog'
 
 /**
- * Parse <option> elements from a custom-select element
- * @param {HTMLElement} selectElement - The custom-select element
- * @param {Function} onValueChange - Callback for value changes
- * @returns {{items: Array, selectedValues: Array}}
+ * Author `<option>` nodes only. The component also mirrors options into an
+ * internal `<select>` inside its trigger; those must not be parsed again.
+ * @param {HTMLElement} selectElement
+ * @returns {HTMLOptionElement[]}
  */
+function authorOptions(selectElement) {
+  /** @type {HTMLOptionElement[]} */
+  const options = []
+  for (const child of selectElement.children) {
+    if (child.tagName === 'OPTION') {
+      options.push(/** @type {HTMLOptionElement} */ (child))
+    } else if (child.tagName === 'OPTGROUP') {
+      for (const opt of child.children) {
+        if (opt.tagName === 'OPTION') options.push(/** @type {HTMLOptionElement} */ (opt))
+      }
+    }
+  }
+  return options
+}
+
 export function parseOptions(selectElement, onValueChange) {
   const items = []
   const selectedValues = []
 
-  selectElement.querySelectorAll('option').forEach(option => {
+  authorOptions(selectElement).forEach(option => {
     const selected = option.hasAttribute('selected')
 
     if (selected) {
@@ -33,9 +48,11 @@ export function parseOptions(selectElement, onValueChange) {
       }
     }
 
+    const group = option.parentElement?.tagName === 'OPTGROUP' ? option.parentElement.getAttribute('label') || null : null
+
     if (!items.find(i => i.value === option.value)) {
       items.push({
-        group: option.parentElement?.label || null,
+        group,
         value: option.value,
         label: option.textContent.trim(), // Use textContent to prevent XSS
         labelText: option.textContent.trim(),

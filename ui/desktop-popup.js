@@ -4,7 +4,7 @@
  */
 
 import { escapeHTML } from '../utils/escape.js'
-import { setupArrowKeyNavigation, setupFocusTrap } from '../keyboard/navigation.js'
+import { setupArrowKeyNavigation } from '../keyboard/navigation.js'
 import { setupTypeahead } from '../keyboard/typeahead.js'
 
 /**
@@ -13,13 +13,21 @@ import { setupTypeahead } from '../keyboard/typeahead.js'
  * @param {Object} groups - Grouped items by group name
  * @returns {string} HTML string with dialog container and items list
  */
-export function createPopupHTML(items, groups) {
-  function itemsHtml(items = [], baseId = '') {
-    return items
+/**
+ * @param {Array} items
+ * @param {Object} groups
+ * @param {{ idPrefix?: string, multiple?: boolean }} [options]
+ */
+export function createPopupHTML(items, groups, options = {}) {
+  const { idPrefix = '', multiple = false } = options
+
+  function itemsHtml(list = [], baseId = '') {
+    return list
       ?.map((item, index) => {
-        const itemId = `${baseId}item-${item.tabindex}-${index}`
+        const itemId = `${baseId}opt-${item.tabindex}-${index}`
+        const value = escapeHTML(String(item.value ?? ''))
         return /*html*/ `
-      <li id="${itemId}" role="option" aria-selected="${item.selected ? 'true' : 'false'}" aria-disabled="${!!item.disabled}" tabindex="${item.tabindex}" data-value="${item.value}" ${item.selected ? 'selected' : ''} ${item.disabled ? 'disabled' : ''}>
+      <li id="${itemId}" part="option" role="option" aria-selected="${item.selected ? 'true' : 'false'}" aria-disabled="${item.disabled ? 'true' : 'false'}" tabindex="-1" data-value="${value}" ${item.selected ? 'selected' : ''} ${item.disabled ? 'disabled' : ''}>
         ${escapeHTML(item.label)}
       </li>
     `
@@ -27,15 +35,17 @@ export function createPopupHTML(items, groups) {
       .join('')
   }
 
-  return `<ul role="listbox">
-    ${itemsHtml(items, 'ungrouped-')}
+  const multi = multiple ? ' aria-multiselectable="true"' : ''
+  return `<ul id="${idPrefix}listbox" part="listbox" role="listbox"${multi}>
+    ${itemsHtml(items, `${idPrefix}u-`)}
     ${Object.keys(groups)
-      .map(
-        group => /*html*/ `
-      <h6>${group}</h6>
-      <ul>${itemsHtml(groups[group], `group-${group.replace(/\s+/g, '-')}-`)}</ul>
+      .map((group, groupIndex) => {
+        const label = escapeHTML(String(group))
+        return /*html*/ `
+      <h6 part="group">${label}</h6>
+      <ul role="group" aria-label="${label}">${itemsHtml(groups[group], `${idPrefix}g-${groupIndex}-`)}</ul>
     `
-      )
+      })
       .join('')}
   </ul>`
 }
@@ -126,15 +136,11 @@ export function setupKeyboard($dialog, callbacks) {
   const $items = Array.from($dialog.querySelectorAll('li'))
   const cleanupFunctions = []
 
-  // Setup focus trap
-  const focusTrapCleanup = setupFocusTrap($dialog)
-  cleanupFunctions.push(focusTrapCleanup)
-
-  // Setup arrow key navigation
+  // Tab leaves the listbox (APG combobox). A modal dialog traps focus until it closes.
   const navigationCleanup = setupArrowKeyNavigation($items, {
+    initialIndex: callbacks.initialIndex,
     onNavigate: index => {
       $items[index]?.focus()
-      // Update aria-activedescendant
       callbacks.onNavigate?.($items[index]?.id)
     },
     onSelect: callbacks.onSelect,
@@ -142,19 +148,21 @@ export function setupKeyboard($dialog, callbacks) {
   })
   cleanupFunctions.push(navigationCleanup)
 
-  // Setup typeahead search
   const typeaheadCleanup = setupTypeahead($items, {
+    isActive: () => $dialog.contains(document.activeElement),
     onNavigate: index => {
+      navigationCleanup.syncIndex?.(index)
       $items[index]?.focus()
-      // Update aria-activedescendant
       callbacks.onNavigate?.($items[index]?.id)
     },
   })
   cleanupFunctions.push(typeaheadCleanup)
 
-  return () => {
+  const unsubscribe = () => {
     cleanupFunctions.forEach(cleanup => cleanup())
   }
+  unsubscribe.syncIndex = index => navigationCleanup.syncIndex?.(index)
+  return unsubscribe
 }
 
 /**

@@ -1,0 +1,85 @@
+{
+  "schemaVersion": "1.0.0",
+  "readme": "",
+  "modules": [
+    {
+      "kind": "javascript-module",
+      "path": "custom-select.js",
+      "declarations": [
+        {
+          "kind": "class",
+          "description": "Select replacement as a form-associated custom element. Behaves like a native select: FormData, validation, keyboard and ARIA combobox/listbox.",
+          "name": "CustomSelect",
+          "customElement": true,
+          "tagName": "custom-select",
+          "superclass": { "name": "HTMLElement", "package": "" },
+          "members": [
+            { "kind": "field", "name": "formAssociated", "type": { "text": "true" }, "static": true, "readonly": true },
+            { "kind": "field", "name": "name", "type": { "text": "string" } },
+            { "kind": "field", "name": "value", "type": { "text": "string | string[]" } },
+            { "kind": "field", "name": "multiple", "type": { "text": "boolean" } },
+            { "kind": "field", "name": "items", "type": { "text": "CustomSelectItem[]" } },
+            { "kind": "field", "name": "placeholder", "type": { "text": "string" } },
+            { "kind": "field", "name": "theme", "type": { "text": "'light' | 'dark' | 'auto'" } },
+            { "kind": "field", "name": "mobileview", "type": { "text": "'native' | 'native-multiple' | 'sheet' | 'desktop'" } },
+            { "kind": "field", "name": "searchable", "type": { "text": "boolean" } },
+            { "kind": "field", "name": "searchPlaceholder", "type": { "text": "string" } },
+            { "kind": "field", "name": "searchMode", "type": { "text": "'local' | 'remote'" } },
+            { "kind": "field", "name": "onsearch", "type": { "text": "CustomSelectSearchHandler | null" } },
+            { "kind": "field", "name": "disabled", "type": { "text": "boolean" } },
+            { "kind": "field", "name": "required", "type": { "text": "boolean" } },
+            { "kind": "field", "name": "useShadowDom", "type": { "text": "boolean" } },
+            { "kind": "field", "name": "noSheetHistory", "type": { "text": "boolean" } }
+          ],
+          "attributes": [
+            { "name": "name", "fieldName": "name", "type": { "text": "string" } },
+            { "name": "value", "fieldName": "value", "type": { "text": "string" } },
+            { "name": "multiple", "fieldName": "multiple", "type": { "text": "boolean" } },
+            { "name": "placeholder", "fieldName": "placeholder", "type": { "text": "string" } },
+            { "name": "theme", "fieldName": "theme", "type": { "text": "'light' | 'dark' | 'auto'" } },
+            { "name": "mobileview", "fieldName": "mobileview", "type": { "text": "'native' | 'native-multiple' | 'sheet' | 'desktop'" } },
+            { "name": "noscroll", "type": { "text": "boolean" } },
+            { "name": "searchable", "fieldName": "searchable", "type": { "text": "boolean" } },
+            { "name": "search-placeholder", "fieldName": "searchPlaceholder", "type": { "text": "string" } },
+            { "name": "search-mode", "fieldName": "searchMode", "type": { "text": "'local' | 'remote'" } },
+            { "name": "disabled", "fieldName": "disabled", "type": { "text": "boolean" } },
+            { "name": "required", "fieldName": "required", "type": { "text": "boolean" } },
+            { "name": "shadow-dom", "fieldName": "useShadowDom", "type": { "text": "boolean" } },
+            { "name": "no-sheet-history", "fieldName": "noSheetHistory", "type": { "text": "boolean" } }
+          ],
+          "events": [
+            { "name": "input", "type": { "text": "CustomEvent<{ value: string | string[] }>" }, "description": "User committed a new value. Bubbles. Not fired by programmatic value assignment." },
+            { "name": "change", "type": { "text": "CustomEvent<{ value: string | string[] }>" }, "description": "User committed a new value, after input. Bubbles. Not fired by programmatic value assignment." },
+            { "name": "popup-open", "type": { "text": "CustomEvent" } },
+            { "name": "popup-close", "type": { "text": "CustomEvent" }, "description": "Cancelable. Fired before the desktop popup closes." },
+            { "name": "filter-change", "type": { "text": "CustomEvent<{ query: string, results: unknown }>" } }
+          ],
+          "cssProperties": [
+            { "name": "--cs-bg" },
+            { "name": "--cs-text" },
+            { "name": "--cs-border" },
+            { "name": "--cs-border-radius" },
+            { "name": "--cs-min-width" },
+            { "name": "--cs-accent-bg" },
+            { "name": "--cs-accent-text" },
+            { "name": "--cs-muted-text" },
+            { "name": "--cs-animation-duration" },
+            { "name": "--cs-focus-ring" },
+            { "name": "--cs-popup-shadow" }
+          ],
+          "cssParts": [
+            { "name": "trigger", "description": "Visible control. Reachable via ::part when shadow-dom is set." },
+            { "name": "value", "description": "Text of the current value or placeholder." },
+            { "name": "popup", "description": "Desktop dialog. In shadow-dom mode it is portaled to document.body, so ::part does not cross to it." },
+            { "name": "listbox" },
+            { "name": "option" },
+            { "name": "group" }
+          ]
+        }
+      ],
+      "exports": [
+        { "kind": "js", "name": "default", "declaration": { "name": "CustomSelect", "module": "custom-select.js" } }
+      ]
+    }
+  ]
+}

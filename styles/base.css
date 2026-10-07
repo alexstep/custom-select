@@ -71,6 +71,12 @@ custom-select {
     border-radius: 0;
   }
 
+  /* Authoring options stay in light DOM so they can change after upgrade. */
+  & > option,
+  & > optgroup {
+    display: none !important;
+  }
+
   /* Клавиатурный фокус (Tab): кольцо на триггере, не при клике мышью */
   &:focus-visible:not(.cs-disabled):not([disabled]) > label {
     outline: 2px solid var(--cs-focus-ring);

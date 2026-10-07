@@ -19,7 +19,7 @@ describe('custom-select hide popup after disconnect', () => {
 
     await new Promise(r => setTimeout(r, 50))
 
-    const popup = document.querySelector('dialog.cs-popup')
+    const popup = el.querySelector('dialog.cs-popup')
     expect(popup?.open).toBe(true)
 
     const option = popup.querySelector('li:not([disabled])')
@@ -29,7 +29,7 @@ describe('custom-select hide popup after disconnect', () => {
 
     await new Promise(r => setTimeout(r, 450))
 
-    expect(document.querySelector('dialog.cs-popup')).toBeNull()
+    expect(popup.isConnected).toBe(false)
 
     parent.remove()
   })

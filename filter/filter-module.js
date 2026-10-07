@@ -298,13 +298,10 @@ export function setupFilter($popup, $items, options = {}) {
 
   // Prevent input events from bubbling up
   $input.addEventListener('keydown', e => {
-    e.stopPropagation()
-
-    // Allow escape to close popup
-    if (e.key === 'Escape') {
-      e.preventDefault()
-      $popup.close?.()
-    }
+    // Arrows, Home/End, Enter, Escape and Tab belong to the listbox.
+    // Everything else (including Space) stays in the filter field.
+    const pass = new Set(['ArrowUp', 'ArrowDown', 'Home', 'End', 'Enter', 'Escape', 'Esc', 'Tab'])
+    if (!pass.has(e.key)) e.stopPropagation()
   })
 
   return () => {

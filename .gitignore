@@ -2,3 +2,7 @@ dist/
 dist-test/
 types-gen/
 node_modules/
+test-results/
+playwright-report/
+blob-report/
+playwright/.cache/

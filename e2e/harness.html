@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>custom-select e2e harness</title>
+  <link rel="stylesheet" href="../styles/base.css">
+  <link rel="stylesheet" href="../styles/mobile.css">
+  <link rel="stylesheet" href="../styles/themes.css">
+  <script type="module">
+    import CustomSelect from '../custom-select.js'
+    if (!customElements.get('custom-select')) customElements.define('custom-select', CustomSelect)
+  </script>
+</head>
+<body>
+  <button type="button" id="outside">Outside</button>
+
+  <form id="singleForm">
+    <custom-select name="fruit" required placeholder="Pick a fruit" mobileview="desktop">
+      <option value="apple">Apple</option>
+      <option value="banana">Banana</option>
+      <option value="cherry">Cherry</option>
+      <option value="mango">Mango</option>
+    </custom-select>
+    <button type="submit">Submit fruit</button>
+  </form>
+
+  <form id="resetForm">
+    <custom-select name="size" mobileview="desktop">
+      <option value="s">Small</option>
+      <option value="m" selected>Medium</option>
+      <option value="l">Large</option>
+    </custom-select>
+    <button type="reset">Reset size</button>
+  </form>
+
+  <form id="multiForm">
+    <custom-select name="tags" multiple mobileview="desktop">
+      <option value="a" selected>Alpha</option>
+      <option value="b">Beta</option>
+      <option value="c" selected>Gamma</option>
+    </custom-select>
+  </form>
+
+  <form id="disabledForm">
+    <custom-select name="locked" disabled mobileview="desktop">
+      <option value="x" selected>Locked</option>
+      <option value="y">Other</option>
+    </custom-select>
+  </form>
+
+  <form id="fieldsetForm">
+    <fieldset disabled>
+      <custom-select name="hidden" mobileview="desktop">
+        <option value="a" selected>Hidden</option>
+        <option value="b">Shown</option>
+      </custom-select>
+    </fieldset>
+  </form>
+
+  <form id="dynForm">
+    <custom-select id="dyn" name="dyn" placeholder="Pick" mobileview="desktop">
+      <option value="a">Alpha</option>
+    </custom-select>
+  </form>
+
+  <form id="nameForm">
+    <custom-select id="rename" mobileview="desktop" placeholder="Pick">
+      <option value="a">A</option>
+      <option value="b">B</option>
+    </custom-select>
+  </form>
+</body>
+</html>

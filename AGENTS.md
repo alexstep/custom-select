@@ -95,7 +95,7 @@ CSS-переменные на элементе или предке: `--cs-bg`, `
 
 ## Релиз
 
-Версию менять только когда это явно попросили. Публикация — workflow `.github/workflows/publish.yml` по тегу `vX.Y.Z` (или GitHub Release с таким тегом). Тег должен совпадать с `package.json`. Самим не вызывать `npm publish`, не ставить теги и не пушить в `main`. Trusted Publisher на npmjs.com: пакет `pure-custom-select`, файл workflow `publish.yml`, environment не задан.
+Версию менять только когда это явно попросили. Публикация — workflow `.github/workflows/publish.yml` только на push тега `vX.Y.Z`. `gh release create` тоже пушит этот тег, отдельный триггер на release не нужен. Тег должен совпадать с `package.json`. Самим не вызывать `npm publish`, не ставить теги и не пушить в `main`. Trusted Publisher на npmjs.com: пакет `pure-custom-select`, файл workflow `publish.yml`, environment не задан.
 
 ## Карта исходников
 

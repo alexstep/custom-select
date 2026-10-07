@@ -4,15 +4,13 @@ on:
   push:
     tags:
       - 'v*'
-  release:
-    types: [published]
 
 permissions:
   id-token: write
   contents: read
 
 concurrency:
-  group: npm-publish-${{ github.event.release.tag_name || github.ref_name }}
+  group: npm-publish-${{ github.ref_name }}
   cancel-in-progress: false
 
 jobs:
@@ -23,15 +21,9 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Fail if the tag version does not match package.json
-        env:
-          RELEASE_TAG: ${{ github.event.release.tag_name }}
         run: |
           set -euo pipefail
-          if [ -n "${RELEASE_TAG}" ]; then
-            TAG="${RELEASE_TAG}"
-          else
-            TAG="${GITHUB_REF_NAME}"
-          fi
+          TAG="${GITHUB_REF_NAME}"
           case "${TAG}" in
             v*) ;;
             *)
@@ -89,11 +81,4 @@ jobs:
           fi
 
       - name: Publish
-        run: |
-          set -euo pipefail
-          VERSION="$(node -p "require('./package.json').version")"
-          if npm view "pure-custom-select@${VERSION}" version >/dev/null 2>&1; then
-            echo "pure-custom-select@${VERSION} is already on the registry"
-            exit 0
-          fi
-          npm publish
+        run: npm publish

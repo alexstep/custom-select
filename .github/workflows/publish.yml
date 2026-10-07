@@ -1,0 +1,84 @@
+name: Publish Package
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  id-token: write
+  contents: read
+
+concurrency:
+  group: npm-publish-${{ github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    if: github.repository == 'alexstep/custom-select'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Fail if the tag version does not match package.json
+        run: |
+          set -euo pipefail
+          TAG="${GITHUB_REF_NAME}"
+          case "${TAG}" in
+            v*) ;;
+            *)
+              echo "Tag '${TAG}' must look like v1.2.0"
+              exit 1
+              ;;
+          esac
+          VERSION="${TAG#v}"
+          PKG="$(node -p "require('./package.json').version")"
+          if [ "${VERSION}" != "${PKG}" ]; then
+            echo "Tag version ${VERSION} does not match package.json version ${PKG}"
+            exit 1
+          fi
+          echo "Publishing pure-custom-select@${PKG}"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Require npm >= 11.5.1
+        run: |
+          set -euo pipefail
+          npm install -g npm@latest
+          node <<'NODE'
+          const { execSync } = require('child_process')
+          const raw = execSync('npm --version', { encoding: 'utf8' }).trim()
+          const [major, minor, patch] = raw.split('.').map(Number)
+          const ok = major > 11 || (major === 11 && (minor > 5 || (minor === 5 && patch >= 1)))
+          if (!ok) {
+            console.error(`npm ${raw} is below 11.5.1`)
+            process.exit(1)
+          }
+          console.log(`npm ${raw}`)
+          NODE
+
+      - uses: oven-sh/setup-bun@v2
+
+      - name: Install, test, and build
+        run: |
+          set -euo pipefail
+          bun install --frozen-lockfile
+          bun test
+          bunx playwright install --with-deps chromium
+          bun run test:e2e
+          npm run build
+
+      - name: Let Trusted Publishing authenticate
+        run: |
+          set -euo pipefail
+          # setup-node writes //registry.npmjs.org/:_authToken=${NODE_AUTH_TOKEN}.
+          # An empty token counts as configured auth and skips the OIDC exchange.
+          if [ -z "${NODE_AUTH_TOKEN:-}" ]; then
+            npm config delete "//registry.npmjs.org/:_authToken" || true
+          fi
+
+      - name: Publish
+        run: npm publish

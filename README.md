@@ -11,7 +11,7 @@ A `<select>` replacement as a native web component. No dependencies, no build st
 - Single & multiple selection, option groups, built-in filter, async search.
 - Themeable with plain CSS variables. Optional Shadow DOM isolation.
 
-[Live demo](https://alexstep.github.io/custom-select/demo.html) · ~10 KB initial gzipped (entry JS + CSS, see [Size](#size)).
+[Live demo](https://alexstep.github.io/custom-select/demo.html) · ~14.9 KB initial gzipped (entry JS, its static chunk, and CSS; see [Size](#size)).
 
 ## Install
 
@@ -319,18 +319,22 @@ Latest Chrome, Firefox, Safari, Edge. Requires Custom Elements v1, `ElementInter
 
 ## Size
 
-`npm run build` emits **code-split** chunks (`--splitting`): the browser loads `custom-select.min.js` first; `desktop-popup`, `mobile-sheet`, and `filter-module` chunks load on first open. CSS is `base` + `mobile` + `themes` combined.
+`npm run build` emits **code-split** chunks (`--splitting`): the browser loads `custom-select.min.js` and one static shared chunk first; `desktop-popup`, `mobile-sheet`, and `filter-module` chunks load on first open. CSS is `base` + `mobile` + `themes` combined.
 
-| What loads | JS (min) | JS (gzip) |
-|------------|----------|-----------|
-| **Initial** (entry only) | 24.65 KB | 7.69 KB |
-| + desktop popup (first open) | +4.93 KB | +2.06 KB |
-| + filter (`searchable`, first open) | +2.41 KB | +1.22 KB |
-| + mobile sheet (first open) | +5.55 KB | +2.19 KB |
-| **All JS chunks** | 38.46 KB | 13.90 KB |
-| **CSS** (`custom-select.min.css`) | 14.10 KB | 3.20 KB |
+Sizes are decimal kilobytes (1000 bytes). **min** is the raw minified file. **gzip** is that file compressed with `gzip -6`, the same compressor as `npm run gzip`. Rows are a partition of `dist/`, so they add up to the totals (within 0.01 KB of rounding).
 
-**Typical first paint:** entry JS + CSS = **10.89 KB gzip**.
+| What loads | min | gzip |
+|------------|-----|------|
+| **Initial** entry (`custom-select.min.js`) | 33.94 KB | 10.34 KB |
+| Static chunk imported by the entry | 1.49 KB | 0.89 KB |
+| + desktop popup (first open) | +5.20 KB | +2.19 KB |
+| + filter (`searchable`, first open) | +3.63 KB | +1.53 KB |
+| Shared chunk used by filter and the mobile sheet | 0.57 KB | 0.35 KB |
+| + mobile sheet (first open) | +6.75 KB | +2.56 KB |
+| **All JS chunks** | 51.59 KB | 17.86 KB |
+| **CSS** (`custom-select.min.css`) | 16.66 KB | 3.63 KB |
+
+**Typical first paint:** entry JS + its static chunk + CSS = **14.86 KB gzip**.
 
 Pre-built `dist/`: ship **all** `*.min.js` files together (chunk hashes are stable per build). Register from the entry bundle:
 

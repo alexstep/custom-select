@@ -1255,6 +1255,8 @@ const CustomSelect = class extends HTMLElement {
    * Загружает desktop-popup и dom-utils при первом открытии
    */
   async #showPopup() {
+    // Атрибут sheet: большое окно с поиском и на десктопе, вместо маленького выпадающего списка
+    if (this.hasAttribute('sheet')) return this.#showMobileSheet()
     if (this.#disabled) return
 
     // Lazy load popup and ensure it exists

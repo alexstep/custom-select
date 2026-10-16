@@ -20,7 +20,7 @@ export function createPopupHTML(items, groups) {
         const itemId = `${baseId}item-${item.tabindex}-${index}`
         return /*html*/ `
       <li id="${itemId}" role="option" aria-selected="${item.selected ? 'true' : 'false'}" aria-disabled="${!!item.disabled}" tabindex="${item.tabindex}" data-value="${item.value}" ${item.selected ? 'selected' : ''} ${item.disabled ? 'disabled' : ''}>
-        ${escapeHTML(item.label)}
+        ${item.photo ? `<img class="cs-item-photo" alt="" loading="lazy" src="${escapeHTML(item.photo)}">` : ''}${escapeHTML(item.label)}${item.hint ? ` <i class="cs-item-hint">${escapeHTML(item.hint)}</i>` : ''}
       </li>
     `
       })

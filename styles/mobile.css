@@ -253,3 +253,38 @@ dialog.cs-mobile-dialog::backdrop {
     opacity: 1;
   }
 }
+
+/* Пункт с аватаром: фото, имя жирным, подпись цветом ссылки; длинное обрезаем */
+.cs-mobile-sheet-item.cs-has-photo {
+  justify-content: flex-start;
+  gap: 10px;
+}
+.cs-mobile-sheet-item.cs-has-photo > span,
+.cs-mobile-sheet-item .cs-item-hint {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cs-mobile-sheet-item.cs-has-photo > span {
+  font-weight: 600;
+  flex: 0 1 auto;
+}
+.cs-mobile-sheet-item .cs-item-hint {
+  flex: 1 1 auto;
+  font-style: normal;
+  color: var(--tg-theme-link-color, var(--cs-accent-text-color));
+}
+.cs-item-photo {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex: none;
+  background: var(--cs-hover-bg);
+  vertical-align: middle;
+  margin-right: 8px;
+}
+.cs-mobile-sheet-item .cs-item-photo {
+  margin-right: 0;
+}

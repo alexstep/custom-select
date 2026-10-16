@@ -40,6 +40,9 @@ export function parseOptions(selectElement, onValueChange) {
         label: option.textContent.trim(), // Use textContent to prevent XSS
         labelText: option.textContent.trim(),
         disabled: option.hasAttribute('disabled'),
+        // Аватар и подпись (например @ник) — по желанию, рисуются в списке выбора
+        photo: option.dataset.photo || null,
+        hint: option.dataset.hint || null,
       })
     }
   })

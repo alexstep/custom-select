@@ -91,10 +91,29 @@ export async function createMobileSheet($select, items, groups) {
       if (item.selected) li.classList.add('selected')
       if (item.disabled) li.classList.add('disabled')
 
+      if (item.photo) {
+        li.classList.add('cs-has-photo')
+        const img = document.createElement('img')
+        img.className = 'cs-item-photo'
+        img.loading = 'lazy'
+        img.alt = ''
+        img.addEventListener('error', () => (img.style.visibility = 'hidden'), { once: true })
+        img.src = item.photo
+        li.appendChild(img)
+      }
+
       // Item label
       const label = document.createElement('span')
       label.textContent = item.labelText || item.label
       li.appendChild(label)
+
+      // Подпись (ник) — отдельно, поиск по ней тоже работает
+      if (item.hint) {
+        const hint = document.createElement('i')
+        hint.className = 'cs-item-hint'
+        hint.textContent = item.hint
+        li.appendChild(hint)
+      }
 
       return li
     })
@@ -203,7 +222,7 @@ export function setupMobileSheetGestures(modal, callbacks = {}) {
     // 1. Filter items and handle highlighting
     allItems.forEach(item => {
       const label = item.querySelector('span')
-      const text = label?.textContent?.toLowerCase() || ''
+      const text = item.textContent?.toLowerCase() || ''
       const matches = !isFiltered || text.includes(searchTerm)
 
       item.style.display = matches ? '' : 'none'

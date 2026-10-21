@@ -102,7 +102,8 @@ export function setupArrowKeyNavigation($items, options) {
     if (root && target instanceof Node && target !== root && !root.contains(target)) return
 
     if (e.key === 'Tab') {
-      onClose?.('tab')
+      e.preventDefault()
+      onClose?.('tab', e)
       return
     }
     if (e.key === 'ArrowDown') {

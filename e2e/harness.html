@@ -69,5 +69,29 @@
       <option value="b">B</option>
     </custom-select>
   </form>
+
+  <form id="searchForm">
+    <custom-select id="searchSel" searchable search-placeholder="Filter fruits" mobileview="desktop" placeholder="Search">
+      <option value="apple">Apple</option>
+      <option value="banana">Banana</option>
+    </custom-select>
+  </form>
+
+  <form id="scrollForm">
+    <custom-select id="scrollSel" noscroll mobileview="desktop">
+      <option value="a">Alpha</option>
+      <option value="b">Beta</option>
+      <option value="c">Gamma</option>
+    </custom-select>
+  </form>
+
+  <form id="groupForm">
+    <custom-select id="groupSel" multiple mobileview="desktop">
+      <option value="a">Apple</option>
+      <optgroup label="Citrus">
+        <option value="lemon">Lemon</option>
+      </optgroup>
+    </custom-select>
+  </form>
 </body>
 </html>

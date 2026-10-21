@@ -73,6 +73,8 @@ declare class CustomSelect extends HTMLElement {
   useShadowDom: boolean
   /** Disable the bottom-sheet history.pushState/back hash side effect. */
   noSheetHistory: boolean
+  /** Mirrors the `noscroll` attribute. Disables scrolling inside the popup. */
+  noscroll: boolean
 
   /** @internal popup element (light DOM) */
   $popup: HTMLDialogElement | null

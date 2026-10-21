@@ -232,6 +232,10 @@ custom-select {
     overflow-x: hidden;
     overflow-y: auto;
     scroll-behavior: smooth;
+
+    &[noscroll] {
+      overflow: hidden;
+    }
     box-sizing: border-box;
     padding: 0;
     /* Убираем дефолтный margin, чтобы управлять отступами через @position-try */
@@ -329,12 +333,27 @@ custom-select {
       margin: 0;
       padding: 0;
     }
-    h6 {
+    h6,
+    .cs-group-label {
+      display: block;
       margin: 0;
       padding: 0.3125rem 0.625rem 0.125rem 0.625rem;
       opacity: 0.5;
       font: inherit;
       cursor: default;
+    }
+
+    li[role="group"] {
+      padding: 0;
+      cursor: default;
+      overflow: visible;
+      background: transparent;
+    }
+
+    li[role="group"]::before,
+    li[role="group"]::after {
+      content: none;
+      display: none;
     }
 
     li {

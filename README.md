@@ -20,7 +20,18 @@ npm install pure-custom-select
 ```
 
 ```js
-import 'pure-custom-select' // registers <custom-select>
+import 'pure-custom-select' // registers <custom-select> and pulls in CSS
+```
+
+Without a bundler, import the CSS-free entry and load the stylesheets yourself. `import 'pure-custom-select'` stays the bundler path: its CSS imports are unchanged.
+
+```html
+<link rel="stylesheet" href="pure-custom-select/styles/base.css">
+<link rel="stylesheet" href="pure-custom-select/styles/themes.css">
+<link rel="stylesheet" href="pure-custom-select/styles/mobile.css">
+<script type="module">
+  import 'pure-custom-select/element' // registers <custom-select>, no CSS import
+</script>
 ```
 
 Registration is idempotent. Importing the package more than once (HMR, micro-frontends, several copies of the package) will not throw `NotSupportedError`; the duplicate `define` is skipped. To register under a different tag name, call the exported helper:
@@ -49,13 +60,7 @@ if (!customElements.get('custom-select')) {
 }
 ```
 
-Styles are imported by `index.js`. When loading files directly, include them yourself:
-
-```html
-<link rel="stylesheet" href="pure-custom-select/styles/base.css">
-<link rel="stylesheet" href="pure-custom-select/styles/themes.css">
-<link rel="stylesheet" href="pure-custom-select/styles/mobile.css">
-```
+Styles are imported by the package root (`import 'pure-custom-select'`). `pure-custom-select/element` is the same registration without those CSS imports.
 
 **Load CSS before JS** when using `<script type="module">` or a CDN bundle. [`base.css`](styles/base.css) hides light-DOM `<option>` / `<optgroup>` and reserves trigger height until the element upgrades (`:not(:defined)`) and until the first render finishes (`:not([data-cs-ready])`) — this prevents a flash of expanded options and layout shift on slow connections. With a bundler, `import 'pure-custom-select'` pulls CSS in with the JS entry; for zero flash on first paint, add `<link rel="stylesheet" href="…/custom-select.min.css">` in `<head>` ahead of the module script.
 

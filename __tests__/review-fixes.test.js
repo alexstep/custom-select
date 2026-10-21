@@ -197,6 +197,7 @@ describe('package sideEffects', () => {
   it('keeps index.js so registration is not tree-shaken', () => {
     const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'))
     expect(pkg.sideEffects).toContain('index.js')
+    expect(pkg.sideEffects).toContain('element.js')
     expect(pkg.sideEffects).toContain('**/*.css')
   })
 })

@@ -18,6 +18,11 @@
       "import": "./custom-select.js",
       "default": "./custom-select.js"
     },
+    "./element": {
+      "types": "./types/index.d.ts",
+      "import": "./element.js",
+      "default": "./element.js"
+    },
     "./dist/custom-select.min.js": "./dist/custom-select.min.js",
     "./dist/custom-select.min.css": "./dist/custom-select.min.css",
     "./dist/*": "./dist/*",
@@ -29,6 +34,7 @@
   },
   "files": [
     "index.js",
+    "element.js",
     "custom-select.js",
     "core/",
     "ui/",
@@ -51,6 +57,7 @@
   },
   "sideEffects": [
     "index.js",
+    "element.js",
     "**/*.css"
   ],
   "scripts": {

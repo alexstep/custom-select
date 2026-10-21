@@ -48,7 +48,7 @@ jobs:
       - name: Require npm >= 11.5.1
         run: |
           set -euo pipefail
-          npm install -g npm@latest
+          npm install -g npm@11.21.1
           node <<'NODE'
           const { execSync } = require('child_process')
           const raw = execSync('npm --version', { encoding: 'utf8' }).trim()
@@ -68,6 +68,7 @@ jobs:
           set -euo pipefail
           bun install --frozen-lockfile
           bun test
+          bun run types:check
           bunx playwright install --with-deps chromium
           bun run test:e2e
           npm run build

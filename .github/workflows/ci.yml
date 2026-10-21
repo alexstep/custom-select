@@ -20,6 +20,8 @@ jobs:
       - uses: oven-sh/setup-bun@v2
       - run: bun install --frozen-lockfile
       - run: bun test
+      - run: bun run types:check
+      - run: bun run build
       - run: bunx playwright install --with-deps chromium
       - run: bun run test:e2e
 

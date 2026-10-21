@@ -41,9 +41,12 @@ export function createPopupHTML(items, groups, options = {}) {
     ${Object.keys(groups)
       .map((group, groupIndex) => {
         const label = escapeHTML(String(group))
+        const labelId = `${idPrefix}g-${groupIndex}-label`
         return /*html*/ `
-      <h6 part="group">${label}</h6>
-      <ul role="group" aria-label="${label}">${itemsHtml(groups[group], `${idPrefix}g-${groupIndex}-`)}</ul>
+      <li role="group" aria-labelledby="${labelId}">
+        <span id="${labelId}" part="group" class="cs-group-label">${label}</span>
+        <ul role="presentation">${itemsHtml(groups[group], `${idPrefix}g-${groupIndex}-`)}</ul>
+      </li>
     `
       })
       .join('')}
@@ -133,7 +136,7 @@ export function positionPopup($trigger, $dialog) {
  * @returns {Function} unsubscribe function
  */
 export function setupKeyboard($dialog, callbacks) {
-  const $items = Array.from($dialog.querySelectorAll('li'))
+  const $items = Array.from($dialog.querySelectorAll('li[role="option"]'))
   const cleanupFunctions = []
 
   // Tab leaves the listbox (APG combobox). A modal dialog traps focus until it closes.
@@ -177,7 +180,7 @@ export function setupKeyboard($dialog, callbacks) {
  * @returns {Function} cleanup function
  */
 export function setupFilter($dialog, options = {}) {
-  const { searchable, onSearch, onSelect, searchMode, host } = options
+  const { searchable, onSearch, onSelect, searchMode, host, placeholder } = options
 
   if (!searchable) {
     return () => {} // No-op cleanup
@@ -189,9 +192,9 @@ export function setupFilter($dialog, options = {}) {
   import('../filter/filter-module.js')
     .then(({ setupFilter: setupFilterModule }) => {
       if (isCleanedUp) return
-      const $items = Array.from($dialog.querySelectorAll('li'))
+      const $items = Array.from($dialog.querySelectorAll('li[role="option"]'))
       filterCleanup = setupFilterModule($dialog, $items, {
-        placeholder: 'Search...',
+        placeholder: placeholder || 'Search...',
         onSearch,
         onSelect,
         searchMode,
@@ -229,7 +232,7 @@ export function setupMouse($dialog, callbacks) {
     }, 111)
   }
 
-  const $items = $dialog.querySelectorAll('li')
+  const $items = $dialog.querySelectorAll('li[role="option"]')
   const mouseHandlers = []
 
   $items.forEach(el => {

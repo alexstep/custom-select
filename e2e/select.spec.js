@@ -194,6 +194,59 @@ test('picks up options added after upgrade', async ({ page }) => {
   expect(await entries(page.locator('#dynForm'))).toEqual([['dyn', 'b']])
 })
 
+test('Tab from an open list moves to the next control', async ({ page }) => {
+  const select = page.locator('#singleForm custom-select')
+  await select.focus()
+  await page.keyboard.press('ArrowDown')
+  await expect(page.locator('dialog[open]')).toBeVisible()
+  await page.keyboard.press('Tab')
+  await expect(page.locator('dialog[open]')).toHaveCount(0)
+  await expect(page.locator('#singleForm button[type="submit"]')).toBeFocused()
+})
+
+test('Shift+Tab from an open list moves to the previous control', async ({ page }) => {
+  const select = page.locator('#singleForm custom-select')
+  await select.focus()
+  await page.keyboard.press('Enter')
+  await expect(page.locator('dialog[open]')).toBeVisible()
+  await page.keyboard.press('Shift+Tab')
+  await expect(page.locator('dialog[open]')).toHaveCount(0)
+  await expect(page.locator('#outside')).toBeFocused()
+})
+
+test('desktop filter uses search-placeholder', async ({ page }) => {
+  const select = page.locator('#searchSel')
+  await select.focus()
+  await page.keyboard.press('Enter')
+  const input = page.locator('dialog[open] .cs-filter-input')
+  await expect(input).toBeVisible()
+  await expect(input).toHaveAttribute('placeholder', 'Filter fruits')
+})
+
+test('noscroll disables popup overflow', async ({ page }) => {
+  const select = page.locator('#scrollSel')
+  await select.focus()
+  await page.keyboard.press('Enter')
+  const dialog = page.locator('dialog[open]')
+  await expect(dialog).toBeVisible()
+  await expect(dialog).toHaveAttribute('noscroll', '')
+  const overflow = await dialog.evaluate(el => getComputedStyle(el).overflowY)
+  expect(overflow).toBe('hidden')
+})
+
+test('grouped options are groups inside the listbox', async ({ page }) => {
+  const select = page.locator('#groupSel')
+  await select.focus()
+  await page.keyboard.press('Enter')
+  const listbox = page.locator('dialog[open] [role="listbox"]')
+  await expect(listbox).toHaveAttribute('aria-multiselectable', 'true')
+  await expect(listbox.locator('h6')).toHaveCount(0)
+  await expect(listbox.locator(':scope > [role="group"] .cs-group-label')).toHaveText('Citrus')
+  await expect(listbox.locator(':scope > [role="group"] [role="option"]')).toHaveAttribute('data-value', 'lemon')
+  const roles = await listbox.locator(':scope > *').evaluateAll(nodes => nodes.map(node => node.getAttribute('role')))
+  expect(roles.every(role => role === 'option' || role === 'group')).toBe(true)
+})
+
 test('name property is reflected and used in FormData', async ({ page }) => {
   const select = page.locator('#rename')
   await select.evaluate(el => {

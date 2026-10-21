@@ -29,7 +29,8 @@
             { "kind": "field", "name": "disabled", "type": { "text": "boolean" } },
             { "kind": "field", "name": "required", "type": { "text": "boolean" } },
             { "kind": "field", "name": "useShadowDom", "type": { "text": "boolean" } },
-            { "kind": "field", "name": "noSheetHistory", "type": { "text": "boolean" } }
+            { "kind": "field", "name": "noSheetHistory", "type": { "text": "boolean" } },
+            { "kind": "field", "name": "noscroll", "type": { "text": "boolean" } }
           ],
           "attributes": [
             { "name": "name", "fieldName": "name", "type": { "text": "string" } },
@@ -38,7 +39,7 @@
             { "name": "placeholder", "fieldName": "placeholder", "type": { "text": "string" } },
             { "name": "theme", "fieldName": "theme", "type": { "text": "'light' | 'dark' | 'auto'" } },
             { "name": "mobileview", "fieldName": "mobileview", "type": { "text": "'native' | 'native-multiple' | 'sheet' | 'desktop'" } },
-            { "name": "noscroll", "type": { "text": "boolean" } },
+            { "name": "noscroll", "fieldName": "noscroll", "type": { "text": "boolean" } },
             { "name": "searchable", "fieldName": "searchable", "type": { "text": "boolean" } },
             { "name": "search-placeholder", "fieldName": "searchPlaceholder", "type": { "text": "string" } },
             { "name": "search-mode", "fieldName": "searchMode", "type": { "text": "'local' | 'remote'" } },

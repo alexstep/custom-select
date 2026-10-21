@@ -39,6 +39,7 @@ const CustomSelect = class extends HTMLElement {
     'required',
     'shadow-dom',
     'no-sheet-history',
+    'id',
   ]
 
   #internals = null
@@ -67,6 +68,10 @@ const CustomSelect = class extends HTMLElement {
   #pendingIndex = 0
   #keyboardSyncIndex = null
   #hostKeydown = null
+  #mobileClick = null
+  #pendingFocusTarget = null
+  #labelObserver = null
+  #labelBindQueued = false
 
   // DOM references
   $popup = null
@@ -119,6 +124,7 @@ const CustomSelect = class extends HTMLElement {
     if ((this.getAttribute('name') ?? '') !== next) this.setAttribute('name', next)
     this.#syncForm()
     this.#render('name')
+    this.#scheduleLabelBind()
   }
 
   get value() {
@@ -226,6 +232,16 @@ const CustomSelect = class extends HTMLElement {
   }
   set searchPlaceholder(v) {
     this.#searchPlaceholder = v || ''
+    const input = this.$popup?.querySelector('.cs-filter-input')
+    if (input) input.placeholder = this.#searchPlaceholder || 'Search...'
+  }
+
+  get noscroll() {
+    return this.hasAttribute('noscroll')
+  }
+  set noscroll(v) {
+    if (v) this.setAttribute('noscroll', '')
+    else this.removeAttribute('noscroll')
   }
 
   get onsearch() {
@@ -330,6 +346,10 @@ const CustomSelect = class extends HTMLElement {
       this.#updateAriaAttributes()
     } else if (name === 'shadow-dom') {
       this.useShadowDom = this.hasAttribute('shadow-dom')
+    } else if (name === 'noscroll') {
+      this.#syncNoScroll()
+    } else if (name === 'id') {
+      this.#scheduleLabelBind()
     } else {
       // For name, placeholder, mobileview - just set the property
       this[name] = newValue
@@ -361,8 +381,9 @@ const CustomSelect = class extends HTMLElement {
     if (isMobile()) {
       this.dataset.mobile = true
       if (isIOS()) this.dataset.ios = true
+      if (this.#mobileClick) this.removeEventListener('click', this.#mobileClick)
       // Always add click listener on mobile to handle dynamic behavior
-      this.addEventListener('click', () => {
+      this.#mobileClick = () => {
         if (this.#isDisabled()) return
         // Android + multiple: use mobile sheet (native select multiple doesn't open picker on Android)
         const isAndroidMultiple = isMobile() && !isIOS() && this.multiple
@@ -371,7 +392,8 @@ const CustomSelect = class extends HTMLElement {
           this.#showMobileSheet()
         }
         // For native select, let the default behavior handle the click
-      })
+      }
+      this.addEventListener('click', this.#mobileClick)
     }
     this.dataset.theme = this.#theme
 
@@ -419,17 +441,8 @@ const CustomSelect = class extends HTMLElement {
       this.#initializing = false
     })
 
-    // Associate with form labels
-    this.labelClickListener = setupLabelAssociation(this, this.id || this.name, async () => {
-      if (this.#isDisabled()) return
-      const isAndroidMultiple = isMobile() && !isIOS() && this.multiple
-      const isMobileSheet = isMobile() && this.mobileview !== 'desktop' && (this.mobileview === 'sheet' || this.searchable || isAndroidMultiple)
-      if (isMobileSheet) {
-        this.#showMobileSheet()
-      } else {
-        this.#showPopup()
-      }
-    })
+    this.#bindLabels()
+    this.#ensureLabelObserver()
 
     // Setup typeahead for when component is focused but popup is closed
     this.#setupComponentTypeahead()
@@ -454,10 +467,18 @@ const CustomSelect = class extends HTMLElement {
     this.removeAttribute('data-cs-ready')
     this.#clearPopupListeners()
     this.labelClickListener?.()
+    this.labelClickListener = null
+    this.#labelObserver?.disconnect()
+    this.#labelObserver = null
     this.#optionWatcher?.cancel?.()
     this.#optionWatcher?.disconnect()
     this.#typeaheadCleanup?.()
     if (this.#hostKeydown) this.removeEventListener('keydown', this.#hostKeydown)
+    if (this.#mobileClick) this.removeEventListener('click', this.#mobileClick)
+    if (this.#renderDebounce) {
+      clearTimeout(this.#renderDebounce)
+      this.#renderDebounce = 0
+    }
 
     // Cleanup popup (light DOM or document.body in shadow mode)
     this.#destroyPopup()
@@ -474,6 +495,84 @@ const CustomSelect = class extends HTMLElement {
 
   #isDisabled() {
     return this.#disabled || this.#formDisabled
+  }
+
+  #optionElements() {
+    return [...(this.$popup?.querySelectorAll('li[role="option"]') ?? [])]
+  }
+
+  #onLabelClick() {
+    if (this.#isDisabled()) return
+    const isAndroidMultiple = isMobile() && !isIOS() && this.multiple
+    const isMobileSheet = isMobile() && this.mobileview !== 'desktop' && (this.mobileview === 'sheet' || this.searchable || isAndroidMultiple)
+    if (isMobileSheet) this.#showMobileSheet()
+    else this.#showPopup()
+  }
+
+  #bindLabels() {
+    this.labelClickListener?.()
+    this.labelClickListener = null
+    if (!this.isConnected) return
+    // `for` matches id. When id is empty, keep the previous name fallback so
+    // existing <label for="the-name"> pairings still open the control.
+    const id = this.id || this.name
+    if (!id) return
+    this.labelClickListener = setupLabelAssociation(this, id, () => this.#onLabelClick())
+  }
+
+  #scheduleLabelBind() {
+    if (this.#labelBindQueued) return
+    this.#labelBindQueued = true
+    queueMicrotask(() => {
+      this.#labelBindQueued = false
+      this.#bindLabels()
+    })
+  }
+
+  #ensureLabelObserver() {
+    if (this.#labelObserver || !document.documentElement) return
+    this.#labelObserver = new MutationObserver(() => this.#scheduleLabelBind())
+    this.#labelObserver.observe(document.documentElement, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ['for'],
+    })
+  }
+
+  #syncNoScroll() {
+    const on = this.hasAttribute('noscroll')
+    this.$popup?.toggleAttribute('noscroll', on)
+    for (const dialog of document.querySelectorAll('.cs-mobile-dialog')) {
+      if (dialog.__csSelect === this) dialog.toggleAttribute('noscroll', on)
+    }
+  }
+
+  #tabbableElements() {
+    const selector = 'a[href], button, input, select, textarea, [tabindex]'
+    return [...document.querySelectorAll(selector)].filter(el => {
+      if (!(el instanceof HTMLElement)) return false
+      if (el.tabIndex < 0) return false
+      if (el.hasAttribute('disabled') || el.getAttribute('aria-disabled') === 'true') return false
+      if (el.closest('.cs-popup, .cs-mobile-dialog')) return false
+      if (el !== this && this.contains(el)) return false
+      if (el.closest('[hidden]')) return false
+      const style = getComputedStyle(el)
+      if (style.display === 'none' || style.visibility === 'hidden') return false
+      return true
+    })
+  }
+
+  #focusTargetForTab(backwards) {
+    const items = this.#tabbableElements()
+    const index = items.indexOf(this)
+    if (index === -1) return this
+    return items[index + (backwards ? -1 : 1)] || this
+  }
+
+  #moveFocusTo(target) {
+    if (target?.isConnected && typeof target.focus === 'function') target.focus()
+    else this.focus()
   }
 
   #isEmptyValue() {
@@ -564,7 +663,7 @@ const CustomSelect = class extends HTMLElement {
   }
 
   #indexForMode(mode) {
-    const items = [...(this.$popup?.querySelectorAll('li') ?? [])]
+    const items = this.#optionElements()
     const enabled = index => items[index] && !items[index].hasAttribute('disabled')
     const first = items.findIndex((_, index) => enabled(index))
     let last = first
@@ -591,7 +690,7 @@ const CustomSelect = class extends HTMLElement {
   }
 
   #applyListFocus(index) {
-    const items = [...(this.$popup?.querySelectorAll('li') ?? [])]
+    const items = this.#optionElements()
     const option = items[index]
     if (!option) return
     this.#keyboardSyncIndex?.(index)
@@ -884,12 +983,30 @@ const CustomSelect = class extends HTMLElement {
         padding: 0;
       }
 
-      .cs-popup h6 {
+      .cs-popup[noscroll] {
+        overflow: hidden;
+      }
+
+      .cs-popup h6,
+      .cs-popup .cs-group-label {
+        display: block;
         margin: 0;
         padding: 0.3125rem 0.625rem 0.125rem 0.625rem;
         opacity: 0.5;
         font: inherit;
         cursor: default;
+      }
+
+      .cs-popup li[role="group"] {
+        padding: 0;
+        cursor: default;
+        overflow: visible;
+      }
+
+      .cs-popup li[role="group"]::before,
+      .cs-popup li[role="group"]::after {
+        content: none;
+        display: none;
       }
 
       .cs-popup li {
@@ -1238,7 +1355,7 @@ const CustomSelect = class extends HTMLElement {
   async #navigateToItem(index) {
     // Wait for popup to be fully rendered (popup is already open from #showPopup promise)
     if (this.$popup?.open) {
-      const $items = Array.from(this.$popup.querySelectorAll('li'))
+      const $items = this.#optionElements()
       const $targetItem = $items[index]
       if ($targetItem) {
         // Use requestAnimationFrame to ensure DOM is ready
@@ -1308,6 +1425,7 @@ const CustomSelect = class extends HTMLElement {
       this.appendChild(popup)
       popup._inBody = false
     }
+    this.#syncNoScroll()
   }
 
   #removeOrphanPopups(keep = null) {
@@ -1521,7 +1639,11 @@ const CustomSelect = class extends HTMLElement {
     const keyboardUnsubscribe = setupKeyboard(this.$popup, {
       initialIndex: this.#pendingIndex,
       onSelect: value => this.#handleItemSelect(value),
-      onClose: reason => this.#hidePopup({ immediate: reason === 'tab' }),
+      onClose: (reason, event) =>
+        this.#hidePopup({
+          immediate: reason === 'tab',
+          focusMove: reason === 'tab' ? (event?.shiftKey ? 'prev' : 'next') : null,
+        }),
       onNavigate: activeDescendantId => {
         this.#activeDescendantId = activeDescendantId
         this.#updateAriaAttributes()
@@ -1544,6 +1666,7 @@ const CustomSelect = class extends HTMLElement {
     const filterUnsubscribe = setupFilter(this.$popup, {
       searchable: this.#searchable,
       searchMode: this.#searchMode,
+      placeholder: this.#searchPlaceholder,
       onSearch: this.#onsearch,
       onSelect: (value, item) => {
         this.#ensureItem(value, item?.label ?? item?.labelText)
@@ -1582,8 +1705,14 @@ const CustomSelect = class extends HTMLElement {
       this.#clearPopupListeners()
       this.#activeDescendantId = null
       this.#updateAriaAttributes()
-      // Restore focus
-      if (this.#previousFocus && typeof this.#previousFocus.focus === 'function') {
+      const target = this.#pendingFocusTarget
+      this.#pendingFocusTarget = null
+      // Tab moves to the next page control. Dialog close also restores the
+      // pre-open focus, so repeat the move after that step.
+      if (target) {
+        this.#moveFocusTo(target)
+        queueMicrotask(() => this.#moveFocusTo(target))
+      } else if (this.#previousFocus && typeof this.#previousFocus.focus === 'function') {
         this.#previousFocus.focus()
       } else {
         this.focus()
@@ -1652,7 +1781,7 @@ const CustomSelect = class extends HTMLElement {
    * Скрыть popup
    * unlockScroll берется из кэша (модуль уже загружен при открытии)
    */
-  #hidePopup({ immediate = false } = {}) {
+  #hidePopup({ immediate = false, focusMove = null } = {}) {
     if (!this.$popup?.open) return
 
     // Dispatch popup-close event before hiding - allow cancellation
@@ -1663,6 +1792,10 @@ const CustomSelect = class extends HTMLElement {
     })
 
     if (!this.dispatchEvent(closeEvent) || closeEvent.defaultPrevented) return
+
+    if (focusMove === 'next' || focusMove === 'prev') {
+      this.#pendingFocusTarget = this.#focusTargetForTab(focusMove === 'prev')
+    }
 
     this.dataset.popup = 'closed'
     if (immediate) {

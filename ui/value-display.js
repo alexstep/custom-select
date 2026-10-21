@@ -58,7 +58,7 @@ export function updateValueDisplay($value, $select, $popup, value, items, placeh
 
   // Update selected in popup list (only if popup exists)
   if ($popup) {
-    const $listItems = $popup.querySelectorAll('li')
+    const $listItems = $popup.querySelectorAll('li[role="option"]')
     $listItems.forEach(li => {
       const itemValue = li.dataset.value
       const isSelected = multiple ? (value || []).includes(itemValue) : value === itemValue
@@ -84,13 +84,14 @@ export function updateValueDisplay($value, $select, $popup, value, items, placeh
 export function generateNativeSelectHtml(items, groups, name, multiple, disabled = false) {
   function optionsHtml(items = []) {
     return items
-      ?.map(
-        item => /*html*/ `
-      <option value="${item.value}" ${item.selected ? 'selected' : ''} ${item.disabled ? 'disabled' : ''}>
+      ?.map(item => {
+        const value = escapeHTML(String(item.value ?? ''))
+        return /*html*/ `
+      <option value="${value}" ${item.selected ? 'selected' : ''} ${item.disabled ? 'disabled' : ''}>
         ${escapeHTML(item.labelText)}
       </option>
     `
-      )
+      })
       .join('')
   }
 
@@ -98,13 +99,14 @@ export function generateNativeSelectHtml(items, groups, name, multiple, disabled
     <select ${multiple ? 'multiple' : ''} ${disabled ? 'disabled' : ''}>
       ${optionsHtml(items)}
       ${Object.keys(groups)
-        .map(
-          group => /*html*/ `
-        <optgroup label="${group}">
+        .map(group => {
+          const label = escapeHTML(String(group))
+          return /*html*/ `
+        <optgroup label="${label}">
           ${optionsHtml(groups[group])}
         </optgroup>
       `
-        )
+        })
         .join('')}
     </select>
   `

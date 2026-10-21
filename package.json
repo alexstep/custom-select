@@ -50,6 +50,7 @@
     "typescript": "^7.0.2"
   },
   "sideEffects": [
+    "index.js",
     "**/*.css"
   ],
   "scripts": {

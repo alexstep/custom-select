@@ -272,6 +272,11 @@ export function setupFilter($popup, $items, options = {}) {
       }
     })
 
+    $popup.querySelectorAll('[role="group"]').forEach(group => {
+      const visible = [...group.querySelectorAll('[role="option"]')].some(item => item.style.display !== 'none')
+      group.style.display = visible ? '' : 'none'
+    })
+
     onFilter?.(visibleCount, originalItems.length)
 
     // Dispatch filter-change event with results

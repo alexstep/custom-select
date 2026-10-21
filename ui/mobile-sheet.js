@@ -78,6 +78,7 @@ export async function createMobileSheet($select, items, groups) {
   const list = document.createElement('ul')
   list.className = 'cs-mobile-sheet-list'
   list.setAttribute('role', 'listbox')
+  if ($select.multiple) list.setAttribute('aria-multiselectable', 'true')
 
   function renderItems(items = [], prefix = 'mobile') {
     return items.map((item, index) => {
@@ -105,14 +106,27 @@ export async function createMobileSheet($select, items, groups) {
 
   renderItems(ungroupedItems, 'mobile-ungrouped').forEach(li => list.appendChild(li))
 
-  // Add grouped items
-  Object.keys(groupedItems).forEach(groupName => {
-    const groupHeader = document.createElement('h6')
-    groupHeader.textContent = groupName
-    list.appendChild(groupHeader)
+  // Group is an owned listbox child. The visible label is presentational text
+  // referenced by aria-labelledby, not a heading sibling of the options.
+  const groupUid = Math.random().toString(36).slice(2, 8)
+  Object.entries(groupedItems).forEach(([groupName, groupItems], groupIndex) => {
+    const group = document.createElement('li')
+    group.setAttribute('role', 'group')
+    const labelId = `mobile-group-label-${groupUid}-${groupIndex}`
+    group.setAttribute('aria-labelledby', labelId)
 
-    const groupPrefix = `mobile-group-${groupName.replace(/\s+/g, '-')}`
-    renderItems(groupedItems[groupName], groupPrefix).forEach(li => list.appendChild(li))
+    const header = document.createElement('span')
+    header.className = 'cs-group-label'
+    header.id = labelId
+    header.setAttribute('part', 'group')
+    header.textContent = groupName
+
+    const nested = document.createElement('ul')
+    nested.setAttribute('role', 'presentation')
+    renderItems(groupItems, `mobile-group-${groupIndex}`).forEach(li => nested.appendChild(li))
+
+    group.append(header, nested)
+    list.appendChild(group)
   })
 
   content.appendChild(list)
@@ -123,6 +137,7 @@ export async function createMobileSheet($select, items, groups) {
   const modal = document.createElement('dialog')
   modal.className = 'cs-mobile-dialog'
   modal.__csSelect = $select
+  if ($select.hasAttribute('noscroll')) modal.setAttribute('noscroll', '')
   syncMobileDialogTheme(modal, $select)
 
   modal.appendChild(sheet)
@@ -217,25 +232,14 @@ export function setupMobileSheetGestures(modal, callbacks = {}) {
       }
     })
 
-    // 2. Handle group headers
-    const headers = list.querySelectorAll('h6')
-    headers.forEach(header => {
+    // 2. Hide a group when every option inside it is hidden.
+    list.querySelectorAll('[role="group"]').forEach(group => {
       if (!isFiltered) {
-        header.style.display = ''
+        group.style.display = ''
         return
       }
-
-      // Find if any sibling items until next header are visible
-      let hasVisibleItems = false
-      let next = header.nextElementSibling
-      while (next && next.tagName !== 'H6') {
-        if (next.classList.contains('cs-mobile-sheet-item') && next.style.display !== 'none') {
-          hasVisibleItems = true
-          break
-        }
-        next = next.nextElementSibling
-      }
-      header.style.display = hasVisibleItems ? '' : 'none'
+      const hasVisibleItems = [...group.querySelectorAll('.cs-mobile-sheet-item')].some(item => item.style.display !== 'none')
+      group.style.display = hasVisibleItems ? '' : 'none'
     })
   }
 
@@ -421,14 +425,17 @@ export function setupMobileSheetGestures(modal, callbacks = {}) {
     }
   }
 
-  // Event listeners
-  modal.addEventListener('click', e => {
+  const handleModalClick = e => {
     if (e.target === modal) hide()
-  })
-  modal.addEventListener('cancel', e => {
+  }
+  const handleModalCancel = e => {
     e.preventDefault()
     hide()
-  })
+  }
+
+  // Event listeners
+  modal.addEventListener('click', handleModalClick)
+  modal.addEventListener('cancel', handleModalCancel)
   list.addEventListener('click', handleItemClick)
 
   // Touch events for drag-to-dismiss
@@ -450,10 +457,22 @@ export function setupMobileSheetGestures(modal, callbacks = {}) {
         filterInput.removeEventListener('input', handleFilterInput)
       }
       clearTimeout(filterTimeout)
+      filterTimeout = null
       if (remoteAbort) remoteAbort.abort()
+      remoteAbort = null
       setLoading(false)
 
       window.removeEventListener('popstate', handlePopstate)
+      document.removeEventListener('mousemove', handleMove)
+      document.removeEventListener('mouseup', handleEnd)
+      sheet.removeEventListener('touchstart', handleStart)
+      sheet.removeEventListener('touchmove', handleMove)
+      sheet.removeEventListener('touchend', handleEnd)
+      sheet.removeEventListener('mousedown', handleStart)
+      modal.removeEventListener('click', handleModalClick)
+      modal.removeEventListener('cancel', handleModalCancel)
+      list.removeEventListener('click', handleItemClick)
+      isDragging = false
 
       if (modal.open) {
         modal.close()
